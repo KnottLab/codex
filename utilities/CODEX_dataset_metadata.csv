@@ -1,0 +1,33 @@
+sampleID,fixation,organ,species,lab,data_path,processed,processor
+191125_BoneMarrow_Rowe_1100,FF,Bone Marrow,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+191126_BoneMarrow_Rowe_1250,FF,Bone Marrow,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+191126_BoneMarrow_Rowe_1500,FF,Bone Marrow,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+191129_BoneMarrow_Rowe_11000,FF,Bone Marrow,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+191202_Tumor_1100,FF,Tumor,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+191202_Tumor_1250,FF,Tumor,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+191203_Tumor_1500,FF,Tumor,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+191203_Tumor_11000,FF,Tumor,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+191220_MetBM_100x,FF,Bone Marrow,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+191223_MetBM_250x,FF,Bone Marrow,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+191227_MetBM_500x,FF,Bone Marrow,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+191230_MetBM_1000x,FF,Bone Marrow,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+200102_MetBM_25x_Raw,FF,Bone Marrow,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+200110_Tumor_CustomConj_100x_Raw,FF,Tumor,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+200117_Tumor_CustomConj_250x_Raw,FF,Tumor,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+200123_Tumor_CustomConj_500x_Raw,FF,Tumor,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+200124_MetBM_100x_Raw,FF,Bone Marrow,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+200127_Tumor_CustomConj_25x_b_Raw,FF,Tumor,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+200128_Tumor_CustomConj_25x_a_Raw,FF,Tumor,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+200130_Tumor_CustomConj_100x_Raw,FF,Tumor,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+200207_MetBM_Repeat_25x_Raw,FF,Bone Marrow,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+200218_Tumor_Concentrated_Raw,FFPE,Tumor,Mouse,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+200313_Human_FFPE_BreastTumor_100x_Raw,FFPE,Breast,Human,Knott,H:/CODEX_data,no,Matlab_CODEX
+200728_HumanFFPE_BreastTumor_50x_Raw,FFPE,Breast,Human,Knott,H:/CODEX_data,no,Matlab_CODEX
+200804_HumanFFPE_BreastTumor_50x_HIER_Raw_200729,FFPE,Breast,Human,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+CODEX Hu Breast Cancer dataset 36 plex,FFPE,Breast,Human,Akoya,E:/Imaging_data/CODEX,yes,Akoya_Proc
+200819_Breast_200x,FFPE,Breast,Human,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+200820_HumanFFPE_BreastTumor_400x,FFPE,Breast,Human,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+200825_HumanFFPE_BreastTumor_100x,FFPE,Breast,Human,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+200904_HumanFFPE_BreastTumor_Final,FFPE,Breast,Human,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+201008_BreastFFPE_Final,FFPE,Breast,Human,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
+201021_BreastFFPE_Final,FFPE,Breast,Human,Knott,D:/Catherine/CODEX_RAW_DATA,no,Matlab_CODEX
