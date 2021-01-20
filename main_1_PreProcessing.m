@@ -14,8 +14,8 @@ for i = 32
     
     %% Create CODEX object
     CODEXobj = create_CODEX_object(D,i); disp(CODEXobj)
-    mkdir(['./data/1_processed/',CODEXobj.sample_id,'/images'])
-    save(['./data/1_processed/',CODEXobj.sample_id,'/CODEXobj_',CODEXobj.sample_id,'.mat'],'CODEXobj')
+    mkdir(['./data/1_processed/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'/images'])
+    save(['./data/1_processed/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'/CODEXobj_',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'.mat'],'CODEXobj')
     
     
     %% Process CODEX images

@@ -61,8 +61,8 @@ if(ch>1)
         
         %%
         k = 1;
-        for x = 1:CODEXobj.Nx
-            for y = 1:CODEXobj.Ny
+        for x = 1:CODEXobj.RNy
+            for y = 1:CODEXobj.RNx
                 
                 disp(['Background Subtraction:  ',CODEXobj.markers2{cl,ch},'  : CL=',num2str(cl),' CH=',num2str(ch),' X=',num2str(x),' Y=',num2str(y),' | ',num2str(round(100*k/(CODEXobj.Nx*CODEXobj.Ny))),'%'])
         
@@ -86,7 +86,7 @@ if(ch>1)
         
         
         %%
-        hf = figure('Position',[510 330 725 645],'Color','w');imagesc(M),axis tight square
+        hf = figure('Position',[510 330 725 645],'Color','w');imagesc(I),axis tight square
         cb = colorbar; cb.Label.String = 'sum( I - \alpha BG1 - \beta BG2 )';
         set(findall(gcf,'-property','TickDir'),'TickDir','out'),title(strrep(CODEXobj.markers2{cl,ch},'_',' | '))
         set(findall(gcf,'-property','FontSize'),'FontSize',16,'FontWeight','bold')
@@ -94,8 +94,8 @@ if(ch>1)
         yticklabels(cellstr(num2str(str2double(get(gca,'yticklabels'))/10))),yticks(get(gca,'ytick')+1),ylabel('\alpha')
         hold on,plot(b*10+1,a*10+1,'r*','markers',20,'linewidth',3)
         
-        mkdir(['./figures/1_processing/',CODEXobj.sample_id,'/3_background_subtraction'])
-        saveas(hf,['./figures/1_processing/',CODEXobj.sample_id,'/3_background_subtraction/',CODEXobj.markers2{cl,ch},'_background_subtraction.png'],'png')
+        mkdir(['./figures/1_processing/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'/3_background_subtraction'])
+        saveas(hf,['./figures/1_processing/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'/3_background_subtraction/',CODEXobj.markers2{cl,ch},'_background_subtraction.png'],'png')
         
         delete(hf)
         
@@ -119,14 +119,14 @@ if((cl==CODEXobj.Ncl-1)&&ch==CODEXobj.Nch)
     for ch = 2:CODEXobj.Nch
         Iat = [];
         for cl = 2:CODEXobj.Ncl-1
-            It = imread(['./figures/1_processing/',CODEXobj.sample_id,'/3_background_subtraction/',CODEXobj.markers2{cl,ch},'_background_subtraction.png'],'png');
-            delete(['./figures/1_processing/',CODEXobj.sample_id,'/3_background_subtraction/',CODEXobj.markers2{cl,ch},'_background_subtraction.png'])
+            It = imread(['./figures/1_processing/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'/3_background_subtraction/',CODEXobj.markers2{cl,ch},'_background_subtraction.png'],'png');
+            delete(['./figures/1_processing/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'/3_background_subtraction/',CODEXobj.markers2{cl,ch},'_background_subtraction.png'])
             Iat = [Iat;It];
         end
         Ia = [Ia Iat];
     end
-    imwrite(Ia,['./figures/1_processing/',CODEXobj.sample_id,'/',CODEXobj.sample_id,'_3_background_subtraction.png'])
-    rmdir(['./figures/1_processing/',CODEXobj.sample_id,'/3_background_subtraction/'],'s')
+    imwrite(Ia,['./figures/1_processing/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'_3_background_subtraction.png'])
+    rmdir(['./figures/1_processing/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'/3_background_subtraction/'],'s')
     
 end
 

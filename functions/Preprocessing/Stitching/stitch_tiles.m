@@ -40,7 +40,7 @@ while(sum(mask(:)==0)>0)
     [x1,y1] = get_processed_tile(mask,x0,y0);
     [x2,y2,mask] = get_unprocessed_tile(mask,x1,y1,x0,y0);
 
-    I2 = I(1+(x2-1)*W:x2*W,1+(y2-1)*W:y2*W)+1;
+    I2 = I(1+(x2-1)*W:x2*W, 1+(y2-1)*W:y2*W)+1;
        
     if(new_tf==true)
         
@@ -91,8 +91,8 @@ I = J;
 
 %%
 if(ch==1&&cl==1)
-    mkdir(['./figures/1_processing/',CODEXobj.sample_id])
-    save_registration_eval_figure(stitching_info,['./figures/1_processing/',CODEXobj.sample_id,'/',CODEXobj.sample_id,'_4_Stitching_cycle_',num2str(cl),'.png'])
+    mkdir(['./figures/1_processing/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region)])
+    save_registration_eval_figure(stitching_info,['./figures/1_processing/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'_4_Stitching_cycle_',num2str(cl),'.png'])
 end
 
 

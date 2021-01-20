@@ -49,18 +49,27 @@ end
 function I = readImageAtZ_v2(CODEXobj,cl,ch,z)
 
 I = [];
-for x = 1:CODEXobj.Nx
+for x = 1:CODEXobj.RNx
     It = [];
-    if(mod(x,2)==0); Jy = CODEXobj.Ny:-1:1; else; Jy = 1:CODEXobj.Ny; end
+%     if(mod(x,2)==0) 
+%         Jy = CODEXobj.RNy:-1:1; 
+%     else
+    Jy = 1:CODEXobj.RNy;
+%     end
+    
     for y = Jy
         
         disp(['reading CL=',num2str(cl),' CH=',num2str(ch),' X=',num2str(x),' Y=',num2str(y),' Z=',num2str(z),'  | ',CODEXobj.markers2{cl,ch}])
-        
-        im = imread([CODEXobj.data_path,'/',CODEXobj.sample_id,'/',CODEXobj.cycle_folders{cl},'/TileScan 1--Stage',num2str2_v2((x-1)*CODEXobj.Ny+y-1),'--Z',num2str2_v2(z-1),'--C',num2str2_v2(ch-1),'.tif']);        
-        It = [It im];
+        if(~isempty(CODEXobj.real_tiles{y,x}))
+            im = read_tile_at_Z(CODEXobj,cl,ch,x,y,z);
+        else
+            im = zeros(CODEXobj.Width,CODEXobj.Width);
+        end
+%         im = imread([CODEXobj.data_path,'/',CODEXobj.sample_id,'/',CODEXobj.cycle_folders{cl},'/TileScan 1--Stage',num2str2_v2((x-1)*CODEXobj.Ny+y-1),'--Z',num2str2_v2(z-1),'--C',num2str2_v2(ch-1),'.tif']);        
+        It = [It; im];
         
     end
-    I = [I;It];
+    I = [I It];
 end
 
 

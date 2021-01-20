@@ -7,15 +7,15 @@ disp('processing nuclei mask ...')
 
 
 %%
-if(exist(['./outputs/3_Segmentation/',CODEXobj.sample_id,'/',CODEXobj.sample_id,'_1_DAPi1_1.tif'],'file')==2)
-    movefile(['./outputs/3_Segmentation/',CODEXobj.sample_id,'/',CODEXobj.sample_id,'_1_DAPi1_1.tif'],...
-        ['./outputs/3_Segmentation/',CODEXobj.sample_id,'/',CODEXobj.sample_id,'_2_stardist.tif']);
+if(exist(['./outputs/3_Segmentation/',CODEXobj.sample_id,'_reg',CODEXobj.region,'/',CODEXobj.sample_id,'_reg',CODEXobj.region,'_1_DAPi1_1.tif'],'file')==2)
+    movefile(['./outputs/3_Segmentation/',CODEXobj.sample_id,'_reg',CODEXobj.region,'/',CODEXobj.sample_id,'_reg',CODEXobj.region,'_1_DAPi1_1.tif'],...
+        ['./outputs/3_Segmentation/',CODEXobj.sample_id,'_reg',CODEXobj.region,'/',CODEXobj.sample_id,'_reg',CODEXobj.region,'_2_stardist.tif']);
 end
 
-nuclei_mask = imread(['./outputs/3_Segmentation/',CODEXobj.sample_id,'/',CODEXobj.sample_id,'_2_stardist.tif']);
+nuclei_mask = imread(['./outputs/3_Segmentation/',CODEXobj.sample_id,'_reg',CODEXobj.region,'/',CODEXobj.sample_id,'_reg',CODEXobj.region,'_2_stardist.tif']);
 %figure('Position',[1 41 1920 963],'Color','w'),imagesc(nuclei_mask),axis tight equal; colorbar;
 
-tissue_mask = imread(['./outputs/3_Segmentation/',CODEXobj.sample_id,'/',CODEXobj.sample_id,'_1_tissue.tif'],'tif');
+tissue_mask = imread(['./outputs/3_Segmentation/',CODEXobj.sample_id,'_reg',CODEXobj.region,'/',CODEXobj.sample_id,'_reg',CODEXobj.region,'_1_tissue.tif'],'tif');
 %figure('Position',[1 41 1920 963],'Color','w'),imagesc(tissue_mask),axis tight equal; colorbar;
 
 

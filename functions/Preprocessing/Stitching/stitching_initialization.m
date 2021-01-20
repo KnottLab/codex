@@ -12,12 +12,12 @@ if(isempty(stitching_info))
 else
     x0 = stitching_info.tile1(1,1);
     y0 = stitching_info.tile1(1,2);
-	mask = zeros(CODEXobj.Nx,CODEXobj.Ny);
+	mask = zeros(CODEXobj.RNy,CODEXobj.RNx);
     mask(x0,y0) = 1;
 end
 
-J = zeros(CODEXobj.Nx*w+D,CODEXobj.Ny*w+D,'uint16');
-M = zeros(CODEXobj.Nx*w+D,CODEXobj.Ny*w+D,'uint8');
+J = zeros(CODEXobj.RNy*w+D,CODEXobj.RNx*w+D,'uint16');
+M = zeros(CODEXobj.RNy*w+D,CODEXobj.RNx*w+D,'uint8');
 
 
 I0 = I(1+(x0-1)*W:x0*W,1+(y0-1)*W:y0*W);

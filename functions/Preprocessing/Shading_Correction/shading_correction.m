@@ -9,8 +9,8 @@ if(ch>1)
     
     %% Concatenation
     IF = [];
-    for x = 1:CODEXobj.Nx
-        for y = 1:CODEXobj.Ny
+    for x = 1:CODEXobj.RNx
+        for y = 1:CODEXobj.RNy
             dx = 1+(x-1)*CODEXobj.Height:x*CODEXobj.Height;
             dy = 1+(y-1)*CODEXobj.Width:y*CODEXobj.Width;
             IF = cat(3,IF,I(dx,dy));
@@ -26,8 +26,8 @@ if(ch>1)
     
     
     %% image correction
-    for x = 1:CODEXobj.Nx
-        for y = 1:CODEXobj.Ny
+    for x = 1:CODEXobj.RNx
+        for y = 1:CODEXobj.RNy
             dx = 1+(x-1)*CODEXobj.Height:x*CODEXobj.Height;
             dy = 1+(y-1)*CODEXobj.Width:y*CODEXobj.Width;
             I(dx,dy) = uint16((double(I(dx,dy))-darkfield)./flatfield);
@@ -45,8 +45,8 @@ if(ch>1)
     subplot(122); imagesc(darkfield);colorbar;title([strrep(CODEXobj.markers2{cl,ch},'_',' | '),'  | Estimated darkfield']);axis tight equal
     set(findall(gcf,'-property','FontSize'),'FontSize',16,'FontWeight','bold')
     
-    mkdir(['./figures/1_processing/',CODEXobj.sample_id,'/2_shading_correction'])
-    saveas(hf,['./figures/1_processing/',CODEXobj.sample_id,'/2_shading_correction/',CODEXobj.markers2{cl,ch},'_shading_correction.png'],'png')
+    mkdir(['./figures/1_processing/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'/2_shading_correction'])
+    saveas(hf,['./figures/1_processing/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'/2_shading_correction/',CODEXobj.markers2{cl,ch},'_shading_correction.png'],'png')
     
     delete(hf)
     

@@ -25,7 +25,7 @@ y0 = P(1);
 
 
 % initialize mask
-mask = zeros(CODEXobj.Nx,CODEXobj.Ny);
+mask = zeros(CODEXobj.RNy,CODEXobj.RNx);
 mask(x0,y0) = 1;
 
 

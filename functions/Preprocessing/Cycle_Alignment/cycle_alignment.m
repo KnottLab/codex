@@ -9,7 +9,7 @@ if(cl>1&&ch==1)
     disp('Cycle Alignment ...')
     
     %% Reference Image
-    Iref = imread(['./data/1_processed/',CODEXobj.sample_id,'/images/',CODEXobj.sample_id,'_1_',CODEXobj.markers{1},'.tif'],'tif');
+    Iref = imread(['./data/1_processed/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'/images/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'_1_',CODEXobj.markers{1},'.tif'],'tif');
     sz_ref = size(Iref);
     
 
@@ -46,8 +46,8 @@ end
 
 %%
 if(ch==1&&sum(cellfun(@isempty,CODEXobj.cycle_alignment_info))==1)
-    mkdir(['./figures/1_processing/',CODEXobj.sample_id])
-    save_cycle_alignment_eval_figure(CODEXobj,['./figures/1_processing/',CODEXobj.sample_id,'/',CODEXobj.sample_id,'_5_cycle_alignment.png'])
+    mkdir(['./figures/1_processing/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),])
+    save_cycle_alignment_eval_figure(CODEXobj,['./figures/1_processing/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'_5_cycle_alignment.png'])
 end
 
 
