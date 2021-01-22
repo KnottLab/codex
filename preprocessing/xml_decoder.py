@@ -62,7 +62,7 @@ class XMLDecoder:
     def _get_resolutionh(self, root):
         dimension = root.find('Element').find('Data').find('Image').find('ImageDescription').find('Dimensions')
         width = int(dimension.find('DimensionDescription').get("NumberOfElements"))
-        length = int(dimension.find('DimensionDescription').get('Length'))
+        length = float(dimension.find('DimensionDescription').get('Length'))
 
         return (10 ^ 6) * length / width
 
@@ -70,18 +70,18 @@ class XMLDecoder:
         exposure_items = root.find('Exposures').findall('ExposureItem')
         marker_list = []
         marker_names = []
-        for item in exposure_items:
+        for item in exposure_items[:num_cycles]:
             antibody = item.find('AntiBody').findall('string')
             for a in antibody:
                 marker_names.append(a.text)
 
-        for i, marker in iter(marker_names):
-            marker_list[i] = marker + '_' + i
+        for i, marker in enumerate(marker_names):
+            marker_list.append(marker + '_' + str(i))
 
         marker_names_array = np.array(marker_names)
-        marker_names_array = marker_names_array.reshape(shape=[num_cycles, num_channels], order='F')
+        marker_names_array = marker_names_array.reshape(num_cycles, num_channels, order='F')
         marker_list = np.array(marker_list)
-        marker_array = marker_list.reshape(shape=[num_cycles, num_channels], order='F')
+        marker_array = marker_list.reshape(num_cycles, num_channels, order='F')
         return marker_names, marker_list, marker_array, marker_names_array
 
     def _get_exposure_times(self, root):
@@ -125,7 +125,7 @@ class XMLDecoder:
         self.decoded_content['resolution'] = self._get_resolutionh(root_xlif)
         self.decoded_content['marker_names'], self.decoded_content['markers'], \
         self.decoded_content['maker_array'], self.decoded_content['marker_names_array'] = self._get_marker_names(
-            root_xml, self.decoded_content['numCycles'],
-            self.decoded_content['numChannels'])
+            root_xml, self.decoded_content['ncl'],
+            self.decoded_content['nch'])
 
         return self.decoded_content

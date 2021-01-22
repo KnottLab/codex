@@ -16,9 +16,9 @@ class ProcessCodex:
         for x in range(self.codex_object.metadata['nx']):
             images_temp = np.array([])
             if x % 2 == 0:
-                y_range = range(start=self.codex_object.metadata['ny'], step=-1, stop=0)
+                y_range = range(self.codex_object.metadata['ny'], 0, -1)
             else:
-                y_range = range(stop=self.codex_object.metadata['ny'])
+                y_range = range(self.codex_object.metadata['ny'])
 
             for y in y_range:
                 print("Processing : " + str(k))
@@ -31,9 +31,11 @@ class ProcessCodex:
                 image = self._calculate_focus_stack(image_s)
 
                 images_temp = np.hstack((images_temp, image))
+                print(images_temp.shape)
                 k += 1
 
             images = np.vstack((images, images_temp))
+            print(images.shape)
 
         return images
 
@@ -47,8 +49,8 @@ class ProcessCodex:
         # Compute fmeasure
         f_measure = np.zeros((m, n, p))
         for focus in range(p):
-            image = image[:, :, p]
-            normalized_image = cv2.normalize(image.astype('float'), None, 0.0, 1.0, cv2.NORM_MINMAX)
+            focused_image = image[:, :, focus]
+            normalized_image = cv2.normalize(focused_image.astype('float'), None, 0.0, 1.0, cv2.NORM_MINMAX)
             f_measure[:, :, focus] = self._calculate_gfocus(normalized_image, nh_size)
 
         # Compute smeasure
@@ -56,8 +58,8 @@ class ProcessCodex:
 
         error = np.zeros((m, n))
         for focus in range(p):
-            error += abs(f_measure[:, :, focus] - gauss * np.exp(-(p - u) ^ 2 / (2 * s ^ 2)))
-            f_measure[:, :, p] = f_measure[:, :, p] / max_values
+            error += abs(f_measure[:, :, focus] - gauss * np.exp(-(focus - u) ** 2 / (2 * s ** 2)))
+            f_measure[:, :, focus] = f_measure[:, :, focus] / max_values
 
         inverse_psnr = ndimage.uniform_filter(error / (p * max_values), size=nh_size, mode='nearest')
 
@@ -83,15 +85,17 @@ class ProcessCodex:
 
     def _calculate_gfocus(self, image, width_size):
         filtered_image = ndimage.uniform_filter(image, size=(width_size, width_size), mode='nearest')
-        filtered_image = (image - filtered_image) ^ 2
+        filtered_image = (image - filtered_image) ** 2
         filtered_image = ndimage.uniform_filter(filtered_image, size=(width_size, width_size), mode='nearest')
         return filtered_image
 
     def _calculate_gauss(self, x, y):
         step = 2
         m, n, p = y.shape
+        print(m, n, p)
         max_values, index_values = y.max(axis=2), y.argmax(axis=2)
         mesh_n, mesh_m = np.meshgrid(range(n), range(m))
+        print(mesh_n.shape)
         index_values_f = index_values.flatten('F')
         index_values_f[index_values_f <= step] = step + 1
         index_values_f[index_values_f >= p - step] = p - step
@@ -101,32 +105,44 @@ class ProcessCodex:
                                        dims=(m, n, p), order='F')
         index_2 = np.ravel_multi_index([mesh_m.flatten('F'), mesh_n.flatten('F'), index_values_f], dims=(m, n, p),
                                        order='F')
-        index_3 = np.ravel_multi_index([[mesh_m.flatten('F'), mesh_n.flatten('F'), index_values_f + step]],
+        index_3 = np.ravel_multi_index([mesh_m.flatten('F'), mesh_n.flatten('F'), index_values_f + step],
                                        dims=(m, n, p), order='F')
+        
+        print(index_1.shape, index_2.shape, index_3.shape)
 
-        index_1[index_values_f <= step] = index_3[index_values_f <= step]
-        index_3[index_values_f >= step] = index_1[index_values_f >= step]
+        index_1[index_values.flatten('F') <= step] = index_3[index_values.flatten('F') <= step]
+        index_3[index_values.flatten('F') >= step] = index_1[index_values.flatten('F') >= step]
+        
+        print("Saving index array")
+        
+        np.save('/common/shaha4/shaha4/index_1.npy', index_1) 
 
+        print(index_1.shape, index_3.shape)
+        
         # create 3 x sub-arrays
         x_1 = np.reshape(x[index_values_f - step], (m, n), order='F')
         x_2 = np.reshape(x[index_values_f], (m, n), order='F')
         x_3 = np.reshape(x[index_values_f + step], (m, n), order='F')
 
         # create 3 y sub-arrays
-        y_1 = np.reshape(np.log(y[index_1]), (m, n), order='F')
-        y_2 = np.reshape(np.log(y[index_2]), (m, n), order='F')
-        y_3 = np.reshape(np.log(y[index_3]), (m, n), order='F')
+        y_1 = np.reshape(np.log(y.ravel()[index_1]), (m, n), order='F')
+        y_2 = np.reshape(np.log(y.ravel()[index_2]), (m, n), order='F')
+        y_3 = np.reshape(np.log(y.ravel()[index_3]), (m, n), order='F')
+
+        print("Saving y1 array")
+
+        np.save('/common/shaha4/shaha4/y_1.npy', y_1)
 
         c = ((y_1 - y_2) * (x_2 - x_3) - (y_2 - y_3) * (x_1 - x_2)) / (
-                (x_1 ^ 2 - x_2 ^ 2) * (x_2 - x_3) - (x_2 ^ 2 - x_3 ^ 2) * (x_1 - x_2))
+                (x_1 ** 2 - x_2 ** 2) * (x_2 - x_3) - (x_2 ** 2 - x_3 ** 2) * (x_1 - x_2))
         b = ((y_2 - y_3) - c * (x_2 - x_3) * (x_2 + x_3)) / (x_2 - x_3)
 
         s = np.sqrt(-1 / (2 * c))
 
-        u = b * s ^ 2
+        u = b * s ** 2
 
-        a = y_1 - b * x_1 - c * x_1 ^ 2
+        a = y_1 - b * x_1 - c * x_1 ** 2
 
-        gauss = np.exp(a + u ^ 2 / (2 * s ^ 2))
+        gauss = np.exp(a + u ** 2 / (2 * s ** 2))
 
         return u, s, gauss, max_values
