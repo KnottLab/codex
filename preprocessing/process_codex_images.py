@@ -4,7 +4,13 @@ import cv2
 import numpy as np
 from utilities.utility import read_tile_at_z
 
+"""
+This is something from the MATLAB version that I found very confusing:
+using x and y to index a matrix implies mat[y,x] in concordance with the parlace that 
+x is 'horizontal' and y is 'vertical', but is often used as mat[x,y].
 
+I propose to change all uses of 'x' and 'y' referring to indexes in a matrix to 'r' or 'rows' and 'c' or 'cols'
+"""
 class ProcessCodex:
 
     def __init__(self, codex_object):
@@ -15,6 +21,7 @@ class ProcessCodex:
         images = np.array([])
         for x in range(self.codex_object.metadata['nx']):
             images_temp = np.array([])
+            # This snaking logic won't be needed once the metadata parser v2 is implemented
             if x % 2 == 0:
                 y_range = range(self.codex_object.metadata['ny'], 0, -1)
             else:

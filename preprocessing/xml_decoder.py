@@ -5,6 +5,7 @@ import numpy as np
 import math
 
 
+# TODO (@nathanin) revamp this to deal with parsing an XML from a slide scanned with multiple ROIs
 class XMLDecoder:
 
     def __init__(self):
@@ -116,6 +117,9 @@ class XMLDecoder:
         self.decoded_content['nch'] = self._number_of_channels(root_xml)
         self.decoded_content['nz'] = self._number_of_z_stacks(root_xml)
         self.decoded_content['nx'], self.decoded_content['ny'] = self._number_of_xy_tiles(root_xlif)
+        # self.decoded_content['RNx'] = # for dealing with non-rectangular ROIs
+        # self.decoded_content['RNy'] = # for dealing with non-rectangular ROIs
+        # self.decoded_content['real_tiles'] = # for dealing with non-rectangular ROIs
         self.decoded_content['tileWidth'], self.decoded_content['tileHeight'], self.decoded_content['ox'], \
         self.decoded_content['oy'], self.decoded_content['width'], self.decoded_content[
             'height'] = self._get_tile_width(root_xlif)

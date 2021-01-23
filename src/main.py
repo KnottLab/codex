@@ -12,6 +12,19 @@ import numpy as np
 
 if __name__ == '__main__':
 
+    """
+    Information from metadata file will be replaced by command line arguments
+    possibly pointing at a config file with metadata information within the raw data folder.
+    
+    Imagine reading something like this:
+
+    /mnt/codex-raw-data/experiment_1
+        ...image folders...
+        metadata.json
+
+    Can't we hide a lot of this in the codex.Codex.__init__ method?
+
+    """
     dataset_metadata = pd.read_csv(filepath_or_buffer='../utilities/CODEX_dataset_metadata.csv')
 
     print(dataset_metadata)
