@@ -57,15 +57,15 @@ class ProcessCodex:
         f_measure = np.zeros((m, n, p))
         for focus in range(p):
             focused_image = image[:, :, focus]
-            normalized_image = cv2.normalize(focused_image.astype('float'), None, 0.0, 1.0, cv2.NORM_MINMAX)
-            f_measure[:, :, focus] = self._calculate_gfocus(normalized_image, nh_size)
+            # normalized_image = cv2.normalize(focused_image.astype('float'), None, 0.0, 1.0, cv2.NORM_MINMAX)
+            f_measure[:, :, focus] = self._calculate_gfocus(focused_image.astype('float'), nh_size)
 
         # Compute smeasure
-        u, s, gauss, max_values = self._calculate_gauss(np.array(range(p)), f_measure)
+        u, s, gauss, max_values = self._calculate_gauss(np.arange(p), f_measure)
 
         error = np.zeros((m, n))
         for focus in range(p):
-            error += abs(f_measure[:, :, focus] - gauss * np.exp(-(focus - u) ** 2 / (2 * s ** 2)))
+            error += abs(f_measure[:, :, focus] - gauss * np.exp(-(focus+1 - u) ** 2 / (2 * s ** 2)))
             f_measure[:, :, focus] = f_measure[:, :, focus] / max_values
 
         inverse_psnr = ndimage.uniform_filter(error / (p * max_values), size=nh_size, mode='nearest')
@@ -81,6 +81,7 @@ class ProcessCodex:
             phi = ndimage.median_filter(phi, size=(3, 3), mode='constant')
 
             # compute weights
+            # this right here produces something different from the corresponding matlab lines (NOTE @nathanin)
             for focus in range(p):
                 f_measure[:, :, p] = 0.5 + 0.5 * np.tanh(phi * (f_measure[:, :, p] - 1))
 
@@ -99,52 +100,39 @@ class ProcessCodex:
     def _calculate_gauss(self, x, y):
         step = 2
         m, n, p = y.shape
-        print(m, n, p)
         max_values, index_values = y.max(axis=2), y.argmax(axis=2)
         mesh_n, mesh_m = np.meshgrid(range(n), range(m))
-        print(mesh_n.shape)
+
         index_values_f = index_values.flatten('F')
         index_values_f[index_values_f <= step] = step + 1
         index_values_f[index_values_f >= p - step] = p - step
 
         # create 3 indices
-        index_1 = np.ravel_multi_index([mesh_m.flatten('F'), mesh_n.flatten('F'), index_values_f - step],
-                                       dims=(m, n, p), order='F')
-        index_2 = np.ravel_multi_index([mesh_m.flatten('F'), mesh_n.flatten('F'), index_values_f], dims=(m, n, p),
-                                       order='F')
-        index_3 = np.ravel_multi_index([mesh_m.flatten('F'), mesh_n.flatten('F'), index_values_f + step],
-                                       dims=(m, n, p), order='F')
-        
-        print(index_1.shape, index_2.shape, index_3.shape)
+        index_1 = np.ravel_multi_index([mesh_m.flatten('F'), mesh_n.flatten('F'), (index_values_f - step) -1], dims=(m, n, p), order='F')
+        index_2 = np.ravel_multi_index([mesh_m.flatten('F'), mesh_n.flatten('F'),  index_values_f -1],         dims=(m, n, p), order='F')
+        index_3 = np.ravel_multi_index([mesh_m.flatten('F'), mesh_n.flatten('F'), (index_values_f + step) -1], dims=(m, n, p), order='F')
 
-        index_1[index_values.flatten('F') <= step] = index_3[index_values.flatten('F') <= step]
-        index_3[index_values.flatten('F') >= step] = index_1[index_values.flatten('F') >= step]
-        
-        print("Saving index array")
-        
-        np.save('/common/shaha4/shaha4/index_1.npy', index_1) 
-
-        print(index_1.shape, index_3.shape)
+        index_1[index_values.flatten('F') <= step-1] = index_3[index_values.flatten('F') <= step-1]
+        index_3[index_values.flatten('F') >= step-1] = index_1[index_values.flatten('F') >= step-1]
         
         # create 3 x sub-arrays
-        x_1 = np.reshape(x[index_values_f - step], (m, n), order='F')
-        x_2 = np.reshape(x[index_values_f], (m, n), order='F')
-        x_3 = np.reshape(x[index_values_f + step], (m, n), order='F')
+        x_1 = np.reshape(x[(index_values_f - step -1)], (m, n), order='F') +1 
+        x_2 = np.reshape(x[(index_values_f -1)],      (m, n), order='F') +1
+        x_3 = np.reshape(x[(index_values_f + step -1)], (m, n), order='F') +1
 
         # create 3 y sub-arrays
-        y_1 = np.reshape(np.log(y.ravel()[index_1]), (m, n), order='F')
-        y_2 = np.reshape(np.log(y.ravel()[index_2]), (m, n), order='F')
-        y_3 = np.reshape(np.log(y.ravel()[index_3]), (m, n), order='F')
+        y_1 = np.reshape(np.log(y.flatten('F')[index_1]), (m, n), order='F')
+        y_2 = np.reshape(np.log(y.flatten('F')[index_2]), (m, n), order='F')
+        y_3 = np.reshape(np.log(y.flatten('F')[index_3]), (m, n), order='F')
 
         print("Saving y1 array")
-
-        np.save('/common/shaha4/shaha4/y_1.npy', y_1)
 
         c = ((y_1 - y_2) * (x_2 - x_3) - (y_2 - y_3) * (x_1 - x_2)) / (
                 (x_1 ** 2 - x_2 ** 2) * (x_2 - x_3) - (x_2 ** 2 - x_3 ** 2) * (x_1 - x_2))
         b = ((y_2 - y_3) - c * (x_2 - x_3) * (x_2 + x_3)) / (x_2 - x_3)
 
-        s = np.sqrt(-1 / (2 * c))
+        # numpy wants complex input in order to give complex output; cast to complex by adding 0j
+        s = np.sqrt(-1 / (2 * c) + 0j)
 
         u = b * s ** 2
 
@@ -152,4 +140,4 @@ class ProcessCodex:
 
         gauss = np.exp(a + u ** 2 / (2 * s ** 2))
 
-        return u, s, gauss, max_values
+        return np.real(u), s, np.real(gauss), max_values
