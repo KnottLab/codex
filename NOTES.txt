@@ -1,0 +1,21 @@
+Notes @nathanin
+
+- Can we start a roadmap document and eventually repurpose it as documentation?
+
+e.g.
+
+Milestone 1: 
+Codex object
+
+Codex(path, ...)
+path: ....
+
+Methods:
+  __init__(path):
+  Initialization of the Codex object should read metadata from the supplied path and run preprocessing by default.
+  populate object attributes with the metadata that is read
+
+  save(path):
+  Write object to a file
+
+  ... etc. 
