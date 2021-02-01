@@ -47,8 +47,8 @@ if __name__ == '__main__':
 
     process_codex = process_codex_images.ProcessCodex(codex_object=codex_object)
 
-    for channel in range(codex_object.metadata['nch']):
-        for cycle in range(codex_object.metadata['ncl']):
+    for channel in range(1):
+        for cycle in range(1):
             image = process_codex.apply_edof(cycle, channel)
             print("EDOF done. Saving file.")
             np.save(file='edof.npy', arr=image)

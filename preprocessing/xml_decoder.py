@@ -29,8 +29,9 @@ class XMLDecoder:
         x = 0
         y = 0
         for tile in attachment.findall('Tile'):
-            x = max(int(tile.get('FieldX')), x)
-            y = max(int(tile.get('FieldY')), y)
+            # This is weird as it's flipped
+            x = max(int(tile.get('FieldY')), x)
+            y = max(int(tile.get('FieldX')), y)
 
         return x, y
 
@@ -64,7 +65,7 @@ class XMLDecoder:
         width = int(dimension.find('DimensionDescription').get("NumberOfElements"))
         length = float(dimension.find('DimensionDescription').get('Length'))
 
-        return (10 ^ 6) * length / width
+        return (10 ** 6) * length / width
 
     def _get_marker_names(self, root, num_cycles, num_channels):
         exposure_items = root.find('Exposures').findall('ExposureItem')
