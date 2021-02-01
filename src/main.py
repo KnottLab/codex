@@ -68,5 +68,6 @@ if __name__ == '__main__':
     for channel in range(codex_object.metadata['nch']):
         for cycle in range(codex_object.metadata['ncl']):
             image = preprocessor.apply_edof(cycle, channel)
+
             print("EDOF done. Saving file.")
             np.save(file='edof.npy', arr=image)

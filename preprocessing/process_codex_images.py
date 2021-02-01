@@ -1,7 +1,8 @@
 """Class for processing codex images"""
 import numpy as np
-from utilities.utility import read_tile_at_z
+from utilities.utility import read_tile_at_z, num2str
 from .edof import _calculate_focus_stack
+
 
 class ProcessCodex:
     """ Preprocessing modules to prepare CODEX scans for analysis
@@ -72,12 +73,15 @@ class ProcessCodex:
             else:
                 y_range = range(stop=self.codex_object.metadata['ny'])
 
+
             for y in y_range:
-                print("Processing : " + str(k))
+                print("Processing : " + self.codex_object.metadata['marker_names_array'][cl][ch] + " CL: " + str(cl) + " CH: " + str(ch) + " X: " + str(x) + " Y: " + str(y))
                 image_s = np.zeros((self.codex_object.metadata['tileWidth'], self.codex_object.metadata['tileWidth'],
                                     self.codex_object.metadata['nz']))
                 for z in range(self.codex_object.metadata['nz']):
                     image = read_tile_at_z(self.codex_object, cl, ch, x, y, z)
+                    if image is None:
+                       raise Exception("Image at above path isn't present")
                     image_s[:, :, z] = image
 
                 image = _calculate_focus_stack(image_s)
@@ -127,6 +131,7 @@ class ProcessCodex:
             aligned_image
         """
         pass
+
 
 
     def cycle_alignment_apply_transform(self, image, cl):

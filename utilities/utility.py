@@ -26,14 +26,16 @@ def num2str(x, version='1'):
 
 def read_tile_at_z(codex_obj, cl, ch, x, y, z):
     if codex_obj.metadata['cycle_folders']:
-        path = codex_obj.data_path + '/' + codex_obj.sample_id + '/' + str(codex_obj.metadata['cycle_folders'][
-            cl]) + '/TileScan 1--Stage' + num2str((x - 1) * codex_obj.metadata['ny'] + y - 1,
-                                                 version='2') + '--Z' + num2str(z - 1, version='2') + '--C' + num2str(
-            ch - 1, version='2') + '.tif'
+        path = str(codex_obj.metadata['cycle_folders'][
+            cl]) + '/TileScan 1--Stage' + num2str(x * (codex_obj.metadata['ny'] + 1) + y,
+                                                 version='2') + '--Z' + num2str(z, version='2') + '--C' + num2str(
+            ch, version='2') + '.tif'
 
     else:
         path = codex_obj.data_path + '/' + codex_obj.sample_id + '/cyc' + num2str(cl) + '_reg00' + num2str(
             codex_obj.metadata['roi']) + '_00' + num2str((x - 1) * codex_obj.metadata['ny'] + y) + '_Z' + num2str(
             z) + '_CH' + num2str(ch) + '.tif'
+    
+    print("Reading tile at: " + path)
 
-    return cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+    return cv2.imread(path, -1)
