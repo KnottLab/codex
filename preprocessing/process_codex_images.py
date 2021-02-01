@@ -64,14 +64,13 @@ class ProcessCodex:
             images (np.uint16): Concatenated images processed by EDOF
         """
         k = 1
-        images = np.array([], dtype=np.uint16) 
-        for x in range(self.codex_object.metadata['nx']):
-            images_temp = np.array([], dtype=np.uint16)
-            if x % 2 == 0:
-                y_range = range(start=self.codex_object.metadata['ny'], step=-1, stop=0)
+        images = None
+        for x in range(self.codex_object.metadata['nx'] + 1):
+            images_temp = None
+            if (x + 1) % 2 == 0:
+                y_range = range(self.codex_object.metadata['ny'], -1, -1)
             else:
-                y_range = range(stop=self.codex_object.metadata['ny'])
-
+                y_range = range(self.codex_object.metadata['ny'] + 1)
 
             for y in y_range:
                 print("Processing : " + self.codex_object.metadata['marker_names_array'][cl][ch] + " CL: " + str(cl) + " CH: " + str(ch) + " X: " + str(x) + " Y: " + str(y))
@@ -84,11 +83,18 @@ class ProcessCodex:
                     image_s[:, :, z] = image
 
                 image = calculate_focus_stack(image_s)
-
-                images_temp = np.hstack((images_temp, image))
+                if images_temp is None:
+                    images_temp = image
+                else:
+                    images_temp = np.concatenate((images_temp, image), 1)
+                print(images_temp.shape)
                 k += 1
 
-            images = np.vstack((images, images_temp))
+            if images is None:
+                images = images_temp
+            else:
+                images = np.concatenate((images, images_temp))
+            print(images.shape)
 
         return images
 
