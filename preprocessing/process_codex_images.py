@@ -1,8 +1,7 @@
 """Class for processing codex images"""
 import numpy as np
 from utilities.utility import read_tile_at_z, num2str
-from .edof import _calculate_focus_stack
-
+from .edof import calculate_focus_stack
 
 class ProcessCodex:
     """ Preprocessing modules to prepare CODEX scans for analysis
@@ -84,7 +83,7 @@ class ProcessCodex:
                        raise Exception("Image at above path isn't present")
                     image_s[:, :, z] = image
 
-                image = _calculate_focus_stack(image_s)
+                image = calculate_focus_stack(image_s)
 
                 images_temp = np.hstack((images_temp, image))
                 k += 1
@@ -115,23 +114,6 @@ class ProcessCodex:
             image: A DAPI channel image from any cycle after the first
         """
         pass
-
-
-    def cycle_alignment_apply_transform(self, image, cl):
-        """ Get and stash a cycle alignment transformation
-
-        Assert that self.codex_object.cycle_alginment{cl} exists
-        If no transform is found, calculate it
-        Apply the transform
-
-        Args:
-            image: Any channel image from any cycle after the first
-
-        Returns:
-            aligned_image
-        """
-        pass
-
 
 
     def cycle_alignment_apply_transform(self, image, cl):
