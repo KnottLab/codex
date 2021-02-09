@@ -45,8 +45,22 @@ class Codex:
         self.processed = False # this should be a flag we set only after processing is done
         self.processor = dataset.at[index, 'processor']
         self._metadata = None
+        self._cycle_alignment_info = None
 
     # I don't really understand what these do
+
+    @property
+    def cycle_alignment_info(self):
+        return self._cycle_alignment_info
+
+    @cycle_alignment_info.setter
+    def cycle_alignment_info(self, value):
+        self._cycle_alignment_info = value
+
+    @cycle_alignment_info.deleter
+    def cycle_alignment_info(self):
+        del self._cycle_alignment_info
+
     @property
     def metadata(self):
         return self._metadata

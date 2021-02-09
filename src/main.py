@@ -9,6 +9,8 @@ from preprocessing import process_codex_images, xml_decoder
 import pandas as pd
 from pathlib import Path
 import numpy as np
+import pickle as pkl
+import sys
 
 
 """
@@ -73,11 +75,23 @@ if __name__ == '__main__':
     print("Codex metadata is: " + str(metadata_dict))
 
     codex_object.metadata = metadata_dict
+    codex_object.cycle_alignment_info = np.empty(shape=codex_object.metadata['ncl'])
 
     process_codex = process_codex_images.ProcessCodex(codex_object=codex_object)
+    image_ref = None
 
     for channel in range(1):
         for cycle in range(1):
             image = process_codex.apply_edof(cycle, channel)
             print("EDOF done. Saving file.")
             np.save(file='edof.npy', arr=image)
+            if channel == 0 and cycle == 0:
+                image_ref = image
+            elif cycle > 0 and channel == 0:
+                cycle_alignment_info, image = process_codex.cycle_alignment_get_transform(image_ref, image)
+                codex_object.cycle_alignment_info[cycle] = cycle_alignment_info
+            else:
+                with open('alignment_info.pkl', 'wb') as f:
+                    pkl.dump(codex_object.cycle_alignment_info, f)
+                sys.exit()
+                # cycle_alignment_info, image = process_codex.cycle_alignment_apply_transform(image_ref, image, codex_object.cycle_alignment_info[cycle])
