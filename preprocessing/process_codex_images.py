@@ -1,7 +1,9 @@
 """Class for processing codex images"""
 import numpy as np
-from utilities.utility import read_tile_at_z, num2str
+from utilities.utility import read_tile_at_z, corr2
 from .edof import calculate_focus_stack
+from skimage.feature import register_translation
+from skimage import transform as tf
 
 class ProcessCodex:
     """ Preprocessing modules to prepare CODEX scans for analysis
@@ -111,7 +113,7 @@ class ProcessCodex:
         pass
 
 
-    def cycle_alignment_get_transform(self, image, cl):
+    def cycle_alignment_get_transform(self, image_ref, image):
         """ Get and stash a cycle alignment transformation
 
         Populate self.codex_object.cycle_alignment{cl}
@@ -119,10 +121,17 @@ class ProcessCodex:
         Args:
             image: A DAPI channel image from any cycle after the first
         """
-        pass
+        print("Calculating cycle alignment")
+        shift, error, diffphase = register_translation(image_ref, image)
+        translation = tf.EuclideanTransform(translation=shift)
+        initial_correlation = corr2(image, image_ref)
+        rotated = tf.warp(image, inverse_map=translation, preserve_range=True, order=0)
+        final_correlation = corr2(rotated, image_ref)
+        cycle_alignment_info = {"shift": shift, "initial_correlation": initial_correlation, "final_correlation": final_correlation}
+        return cycle_alignment_info, rotated
 
 
-    def cycle_alignment_apply_transform(self, image, cl):
+    def cycle_alignment_apply_transform(self, image_ref, image, cycle_alignment_info):
         """ Get and stash a cycle alignment transformation
 
         Assert that self.codex_object.cycle_alginment{cl} exists
@@ -135,7 +144,14 @@ class ProcessCodex:
         Returns:
             aligned_image
         """
-        pass
+        print("Applying cycle alignment")
+        shift = cycle_alignment_info.get('shift')
+        translation = tf.EuclideanTransform(translation=shift)
+        initial_correlation = corr2(image_ref, image)
+        rotated = tf.warp(image, inverse_map=translation, preserve_range=True, order=0)
+        final_correlation = corr2(image_ref, rotated)
+        cycle_alignment_info = {"shift": shift, "initial_correlation": initial_correlation, "final_correlation": final_correlation}
+        return cycle_alignment_info, rotated
 
 
     def stitch_images(self, image):

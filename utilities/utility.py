@@ -1,11 +1,17 @@
 """Utility functions for CODEX"""
 import pandas as pd
 import cv2
+import numpy as np
 
 
 def read_table(path):
     table = pd.read_csv(path)
     return table
+
+def corr2(a, b):
+    a = a - np.mean(a)
+    b = b - np.mean(b)
+    return (a*b).sum() / np.sqrt((a*a).sum() * (b*b).sum())
 
 
 def num2str(x, version='1'):
