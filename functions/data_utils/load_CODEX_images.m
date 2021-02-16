@@ -143,7 +143,7 @@ function It = read_CODEX_image(CODEXobj,load_folder,cl,ch)
 
 if(strcmp(CODEXobj.processor,'Matlab_CODEX'))
     
-    It = imread(['./data/',load_folder,'/',CODEXobj.sample_id,'/images/',CODEXobj.sample_id,'_',num2str((cl-1)*CODEXobj.Nch+ch),'_',CODEXobj.markers2{cl,ch},'.tif'],'tif');
+    It = imread(['./data/',load_folder,'/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'/images/',CODEXobj.sample_id,'_reg',num2str(CODEXobj.region),'_',num2str((cl-1)*CODEXobj.Nch+ch),'_',CODEXobj.markers2{cl,ch},'.tif'],'tif');
     
 elseif(strcmp(CODEXobj.processor,'Akoya_Proc'))
     image_folder = strrep(cellstr(ls([CODEXobj.data_path,'/',CODEXobj.sample_id,'/*'])),' ','');
