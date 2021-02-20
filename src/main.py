@@ -47,13 +47,13 @@ if __name__ == '__main__':
 
     codex_object.metadata = metadata_dict
 
-    codex_object.cycle_alignment_info = np.empty(shape=codex_object.metadata['ncl'])
+    codex_object.cycle_alignment_info = []
 
     process_codex = process_codex_images.ProcessCodex(codex_object=codex_object)
     image_ref = None
 
-    for channel in range(1):
-        for cycle in range(1):
+    for channel in range(self.codex_object.metadata['nch']):
+        for cycle in range(self.codex_object.metadata['ncl']):
             image = process_codex.apply_edof(cycle, channel)
             print("EDOF done. Saving file.")
             np.save(file='edof.npy', arr=image)
@@ -61,9 +61,8 @@ if __name__ == '__main__':
                 image_ref = image
             elif cycle > 0 and channel == 0:
                 cycle_alignment_info, image = process_codex.cycle_alignment_get_transform(image_ref, image)
-                codex_object.cycle_alignment_info[cycle] = cycle_alignment_info
+                codex_object.cycle_alignment_info.append(cycle_alignment_info)
             else:
-                with open('alignment_info.pkl', 'wb') as f:
-                    pkl.dump(codex_object.cycle_alignment_info, f)
-                sys.exit()
-                # cycle_alignment_info, image = process_codex.cycle_alignment_apply_transform(image_ref, image, codex_object.cycle_alignment_info[cycle])
+                image = process_codex.cycle_alignment_apply_transform(image_ref, image, codex_object.cycle_alignment_info[cycle])
+
+            

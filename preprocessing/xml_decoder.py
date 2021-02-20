@@ -81,9 +81,9 @@ class XMLDecoder:
             marker_list.append(marker + '_' + str(i))
 
         marker_names_array = np.array(marker_names)
-        marker_names_array = marker_names_array.reshape(num_cycles, num_channels, order='F')
+        marker_names_array = marker_names_array.reshape(num_cycles, num_channels)
         marker_list = np.array(marker_list)
-        marker_array = marker_list.reshape(num_cycles, num_channels, order='F')
+        marker_array = marker_list.reshape(num_cycles, num_channels)
         return marker_names, marker_list, marker_array, marker_names_array
 
     def _get_exposure_times(self, root):

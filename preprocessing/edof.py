@@ -116,6 +116,8 @@ def calculate_gauss(x, y):
     # array values for b slightly diverge
     b = ((y_2 - y_3) - c * (x_2 - x_3) * (x_2 + x_3)) / (x_2 - x_3)
     np.save('/common/shaha4/shaha4/b.npy', b)
+   
+    c[c == 0] = 1
 
     sqrt_array = (-1 / (2 * c)).astype('complex')
     s = np.sqrt(sqrt_array)

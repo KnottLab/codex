@@ -2,8 +2,8 @@
 import numpy as np
 from utilities.utility import read_tile_at_z, corr2
 from .edof import calculate_focus_stack
-from skimage.feature import register_translation
-from skimage import transform as tf
+from image_registration import chi2_shift
+from image_registration.fft_tools import shift
 
 class ProcessCodex:
     """ Preprocessing modules to prepare CODEX scans for analysis
@@ -121,14 +121,26 @@ class ProcessCodex:
         Args:
             image: A DAPI channel image from any cycle after the first
         """
+        width = self.codex_object.metadata['width']
+        shift_list = []
+        initial_correlation_list = []
+        final_correlation_list = []
         print("Calculating cycle alignment")
-        shift, error, diffphase = register_translation(image_ref, image)
-        translation = tf.EuclideanTransform(translation=shift)
-        initial_correlation = corr2(image, image_ref)
-        rotated = tf.warp(image, inverse_map=translation, preserve_range=True, order=0)
-        final_correlation = corr2(rotated, image_ref)
-        cycle_alignment_info = {"shift": shift, "initial_correlation": initial_correlation, "final_correlation": final_correlation}
-        return cycle_alignment_info, rotated
+        for x in range(self.codex_object.metadata['nx']):
+            for y in range(self.codex_object.metadata['ny']):
+                image_ref_subset = image_ref[x*width:(x+1)*width, y*width:(y+1)*width]
+                image_subset = image[x*width:(x+1)*width, y*width:(y+1)*width]
+                print(image_subset.shape)
+                xoff,yoff,exoff,eyoff = chi2_shift(image_ref_subset, image_subset, return_error=True, upsample_factor='auto')
+                shift_list.append([xoff, yoff])
+                initial_correlation = corr2(image_subset, image_ref_subset)
+                initial_correlation_list.append(initial_correlation)
+                image_subset = shift.shift2d(image_subset, -xoff, -yoff)
+                final_correlation = corr2(image_subset, image_ref_subset)
+                final_correlation_list.append(final_correlation)
+
+        cycle_alignment_info = {"shift": shift_list, "initial_correlation": initial_correlation_list, "final_correlation": final_correlation_list}
+        return cycle_alignment_info, image
 
 
     def cycle_alignment_apply_transform(self, image_ref, image, cycle_alignment_info):
@@ -145,13 +157,21 @@ class ProcessCodex:
             aligned_image
         """
         print("Applying cycle alignment")
-        shift = cycle_alignment_info.get('shift')
-        translation = tf.EuclideanTransform(translation=shift)
-        initial_correlation = corr2(image_ref, image)
-        rotated = tf.warp(image, inverse_map=translation, preserve_range=True, order=0)
-        final_correlation = corr2(image_ref, rotated)
-        cycle_alignment_info = {"shift": shift, "initial_correlation": initial_correlation, "final_correlation": final_correlation}
-        return cycle_alignment_info, rotated
+        shift_list = np.array(cycle_alignment_info.get('shift'))
+        shift_array = shift_list.reshape(self.codex_object.metadata['nx'], self.codex_object.metadata['ny'])
+        initial_correlation_list = []
+        final_correlation_list = []
+        for x in range(self.codex_object.metadata['nx']):
+            for y in range(self.codex_object.metadata['ny']):
+               shift = shift_array[x][y]
+               image_ref_subset = image_ref[x*width:(x+1)*width, y*width:(y+1)*width]
+               image_subset = image[x*width:(x+1)*width, y*width:(y+1)*width]  
+               initial_correlation = corr2(image_ref_subset, image_subset)
+               initial_correlation_list.append(initial_correlation)
+               image_subset = shift.shift2d(image_subset, -shift[0], -shift[1])
+               final_correlation = corr2(image_ref_subset, image_subset)
+               final_correlation_list.append(final_correlation)
+        return image
 
 
     def stitch_images(self, image):
@@ -161,6 +181,6 @@ class ProcessCodex:
             image: Any channel image
 
         Returns:
-            aligned_image
+            aligned_image:
         """
         pass
