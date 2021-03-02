@@ -48,15 +48,19 @@ if __name__ == '__main__':
     codex_object.metadata = metadata_dict
 
     codex_object.cycle_alignment_info = []
+    codex_object.background_1 = []
+    codex_object.background_2 = []
 
     process_codex = process_codex_images.ProcessCodex(codex_object=codex_object)
     image_ref = None
+    cycle_range = [0, codex_object.metadata['ncl']-1] + list(range(1, codex_object.metadata['ncl']-1))
 
-    for channel in range(self.codex_object.metadata['nch']):
-        for cycle in range(self.codex_object.metadata['ncl']):
+    for channel in range(codex_object.metadata['nch']):
+        for cycle in cycle_range:
             image = process_codex.apply_edof(cycle, channel)
             print("EDOF done. Saving file.")
             np.save(file='edof.npy', arr=image)
+
             if channel == 0 and cycle == 0:
                 image_ref = image
             elif cycle > 0 and channel == 0:
@@ -65,4 +69,15 @@ if __name__ == '__main__':
             else:
                 image = process_codex.cycle_alignment_apply_transform(image_ref, image, codex_object.cycle_alignment_info[cycle])
 
-            
+
+            if channel > 0:
+                if cycle == 0:
+                    codex_object.background_1.append(image)
+                elif cycle == codex_object.metadata['ncl'] - 1:
+                    codex_object.background_2.append(image)
+                else:
+                    image = process_codex.background_subtraction(image, codex_object.background_1[channel],
+                                                                 codex_object.background_2[channel], cycle, channel)
+
+                    print("Background subtraction done")
+                    np.save("background_subtraction_{0}.npy".format(codex_object.metadata['marker_names_array'][cycle][channel]), image)

@@ -4,6 +4,8 @@ from utilities.utility import read_tile_at_z, corr2
 from .edof import calculate_focus_stack
 from image_registration import chi2_shift
 from image_registration.fft_tools import shift
+from skimage.morphology import octagon
+import cv2
 
 class ProcessCodex:
     """ Preprocessing modules to prepare CODEX scans for analysis
@@ -101,7 +103,7 @@ class ProcessCodex:
         return images
 
 
-    def background_subtraction(self, image):
+    def background_subtraction(self, image, background_1, background_2, cycle, channel):
         """ Apply background subtraction 
 
         Args:
@@ -110,13 +112,30 @@ class ProcessCodex:
         Returns:
             image: Image with background subtracted
         """
-        pass
+        background_1 = image[background_1 > image]
+        background_2 = image[background_2 > image]
+        kernel_1 = octagon(1, 1)
+        image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel_1)
+        background_1 = cv2.morphologyEx(background_1, cv2.MORPH_CLOSE, kernel_1)
+        background_2 = cv2.morphologyEx(background_2, cv2.MORPH_CLOSE, kernel_1)
+        kernel_2 = octagon(5, 2)
+        image = cv2.morphologyEx(image, cv2.MORPH_TOPHAT, kernel_2)
+        background_1 = cv2.morphologyEx(background_1, cv2.MORPH_TOPHAT, kernel_2)
+        background_2 = cv2.morphologyEx(background_2, cv2.MORPH_TOPHAT, kernel_2)
+        a = (self.codex_object.metadata['ncl'] - cycle - 1) / (self.codex_object['metadata'] - 3)
+        b = 1 - a
+        image = image  - a*background_1 - b*background_2
+        image = image + 1
+        image[not(image > 0 and background_1 > 0 and background_2 > 0)] = 0
+        return image
 
 
     def cycle_alignment_get_transform(self, image_ref, image):
         """ Get and stash a cycle alignment transformation
 
         Populate self.codex_object.cycle_alignment{cl}
+
+        We use chi2_shift algorithm from astropy to register the image.
 
         Args:
             image: A DAPI channel image from any cycle after the first
@@ -157,6 +176,7 @@ class ProcessCodex:
             aligned_image
         """
         print("Applying cycle alignment")
+        width = self.codex_object.metadata['width']
         shift_list = np.array(cycle_alignment_info.get('shift'))
         shift_array = shift_list.reshape(self.codex_object.metadata['nx'], self.codex_object.metadata['ny'])
         initial_correlation_list = []

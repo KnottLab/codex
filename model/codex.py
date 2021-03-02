@@ -46,8 +46,32 @@ class Codex:
         self.processor = dataset.at[index, 'processor']
         self._metadata = None
         self._cycle_alignment_info = None
+        self._background_1 = None
+        self._background_2 = None
 
-    # I don't really understand what these do
+    @property
+    def background_1(self):
+        return self._background_1
+
+    @background_1.setter
+    def background_1(self, value):
+        self._background_1  = value
+
+    @background_1.deleter
+    def background_1(self):
+        del self._background_1
+
+    @property
+    def background_2(self):
+        return self._background_2
+
+    @background_2.setter
+    def background_2(self, value):
+        self._background_2 = value
+
+    @background_2.deleter
+    def background_2(self):
+        del self._background_2
 
     @property
     def cycle_alignment_info(self):
