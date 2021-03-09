@@ -5,12 +5,11 @@
 # Step 1: Pre-processing
 
 from model import codex, metadata
-from preprocessing import process_codex_images, xml_decoder
+from preprocessing import process_codex_images, xml_decoder, stitching
 import pandas as pd
 from pathlib import Path
 import numpy as np
 import pickle as pkl
-import sys
 
 if __name__ == '__main__':
 
@@ -52,12 +51,14 @@ if __name__ == '__main__':
     codex_object.background_2 = []
 
     process_codex = process_codex_images.ProcessCodex(codex_object=codex_object)
+    stitching_object = stitching.Stitching(codex_object)
+
     image_ref = None
-    cycle_range = [0, codex_object.metadata['ncl']-1, 1]
+    cycle_range = [0, codex_object.metadata['ncl'] - 1, 1]
     print("Cycle range is: " + str(cycle_range))
 
-    for channel in range(2):
-        for cycle, cycle_index in zip(cycle_range, range(len(cycle_range))):
+    for channel in range(codex_object.metadata['nch']):
+        for cycle, cycle_index in zip(cycle_range, range(codex_object.metadata['ncl'])):
             image = process_codex.apply_edof(cycle, channel)
             print("EDOF done. Saving file.")
             np.save(file='edof.npy', arr=image)
@@ -68,8 +69,9 @@ if __name__ == '__main__':
                 cycle_alignment_info, image = process_codex.cycle_alignment_get_transform(image_ref, image)
                 codex_object.cycle_alignment_info.append(cycle_alignment_info)
             else:
-                image = process_codex.cycle_alignment_apply_transform(image_ref, image, codex_object.cycle_alignment_info[cycle_index-1])  
-
+                image = process_codex.cycle_alignment_apply_transform(image_ref, image,
+                                                                      codex_object.cycle_alignment_info[
+                                                                          cycle_index - 1])
 
             if channel > 0:
                 if cycle == 0:
@@ -77,8 +79,16 @@ if __name__ == '__main__':
                 elif cycle == codex_object.metadata['ncl'] - 1:
                     codex_object.background_2.append(image)
                 else:
-                    image = process_codex.background_subtraction(image, codex_object.background_1[channel-1],
-                                                                 codex_object.background_2[channel-1], cycle, channel)
+                    image = process_codex.background_subtraction(image, codex_object.background_1[channel - 1],
+                                                                 codex_object.background_2[channel - 1], cycle, channel)
 
                     print("Background subtraction done")
-                    np.save("background_subtraction_{0}.npy".format(codex_object.metadata['marker_names_array'][cycle][channel]), image)
+                    np.save("background_subtraction_{0}.npy".format(
+                        codex_object.metadata['marker_names_array'][cycle][channel]), image)
+
+            print("Stitching started")
+            tiles = stitching_object.start_stitching(image, 2048)
+            print("Stitching done")
+            with open("tiles.pkl", "wb") as f:
+                pkl.dump(tiles, f)
+            print("Stitching file saved")

@@ -7,6 +7,7 @@ from image_registration.fft_tools import shift
 from skimage.morphology import octagon
 import cv2
 
+
 class ProcessCodex:
     """ Preprocessing modules to prepare CODEX scans for analysis
 
@@ -77,13 +78,14 @@ class ProcessCodex:
                 y_range = range(self.codex_object.metadata['ny'] + 1)
 
             for y in y_range:
-                print("Processing : " + self.codex_object.metadata['marker_names_array'][cl][ch] + " CL: " + str(cl) + " CH: " + str(ch) + " X: " + str(x) + " Y: " + str(y))
+                print("Processing : " + self.codex_object.metadata['marker_names_array'][cl][ch] + " CL: " + str(
+                    cl) + " CH: " + str(ch) + " X: " + str(x) + " Y: " + str(y))
                 image_s = np.zeros((self.codex_object.metadata['tileWidth'], self.codex_object.metadata['tileWidth'],
                                     self.codex_object.metadata['nz']))
                 for z in range(self.codex_object.metadata['nz']):
                     image = read_tile_at_z(self.codex_object, cl, ch, x, y, z)
                     if image is None:
-                       raise Exception("Image at above path isn't present")
+                        raise Exception("Image at above path isn't present")
                     image_s[:, :, z] = image
 
                 image = calculate_focus_stack(image_s)
@@ -102,7 +104,6 @@ class ProcessCodex:
 
         return images
 
-
     def background_subtraction(self, image, background_1, background_2, cycle, channel):
         """ Apply background subtraction 
 
@@ -112,7 +113,8 @@ class ProcessCodex:
         Returns:
             image: Image with background subtracted
         """
-        print("Background subtraction started for cycle {0} and channel {1}".format(cycle, channel))        
+        print("Background subtraction started for cycle {0} and channel {1}".format(cycle, channel))
+
         background_1[background_1 > image] = image[background_1 > image]
         background_2[background_2 > image] = image[background_2 > image]
         kernel_1 = octagon(1, 1)
@@ -125,11 +127,10 @@ class ProcessCodex:
         background_2 = cv2.morphologyEx(background_2, cv2.MORPH_TOPHAT, kernel_2)
         a = (self.codex_object.metadata['ncl'] - cycle - 1) / (self.codex_object.metadata['ncl'] - 3)
         b = 1 - a
-        image = image  - a*background_1 - b*background_2
+        image = image - a * background_1 - b * background_2
         image = image + 1
-        image[not(image > 0 and background_1 > 0 and background_2 > 0)] = 0
+        image[not (image > 0 and background_1 > 0 and background_2 > 0)] = 0
         return image
-
 
     def cycle_alignment_get_transform(self, image_ref, image):
         """ Get and stash a cycle alignment transformation
@@ -148,22 +149,23 @@ class ProcessCodex:
         print("Calculating cycle alignment")
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
-                image_ref_subset = image_ref[x*width:(x+1)*width, y*width:(y+1)*width]
-                image_subset = image[x*width:(x+1)*width, y*width:(y+1)*width]
+                image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
+                image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 print(image_subset.shape)
-                xoff,yoff,exoff,eyoff = chi2_shift(image_ref_subset, image_subset, return_error=True, upsample_factor='auto')
+                xoff, yoff, exoff, eyoff = chi2_shift(image_ref_subset, image_subset, return_error=True,
+                                                      upsample_factor='auto')
                 shift_list.append((xoff, yoff))
                 initial_correlation = corr2(image_subset, image_ref_subset)
                 initial_correlation_list.append(initial_correlation)
                 image_subset = shift.shift2d(image_subset, -xoff, -yoff)
                 final_correlation = corr2(image_subset, image_ref_subset)
                 final_correlation_list.append(final_correlation)
-        
+
         print("Shift list size is: " + str(len(shift_list)))
         print(shift_list)
-        cycle_alignment_info = {"shift": shift_list, "initial_correlation": initial_correlation_list, "final_correlation": final_correlation_list}
+        cycle_alignment_info = {"shift": shift_list, "initial_correlation": initial_correlation_list,
+                                "final_correlation": final_correlation_list}
         return cycle_alignment_info, image
-
 
     def cycle_alignment_apply_transform(self, image_ref, image, cycle_alignment_info):
         """ Get and stash a cycle alignment transformation
@@ -185,16 +187,15 @@ class ProcessCodex:
         final_correlation_list = []
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
-               xoff, yoff = shift_list[x + 3 * y]
-               image_ref_subset = image_ref[x*width:(x+1)*width, y*width:(y+1)*width]
-               image_subset = image[x*width:(x+1)*width, y*width:(y+1)*width]  
-               initial_correlation = corr2(image_ref_subset, image_subset)
-               initial_correlation_list.append(initial_correlation)
-               image_subset = shift.shift2d(image_subset, -xoff, -yoff)
-               final_correlation = corr2(image_ref_subset, image_subset)
-               final_correlation_list.append(final_correlation)
+                xoff, yoff = shift_list[x + 3 * y]
+                image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
+                image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
+                initial_correlation = corr2(image_ref_subset, image_subset)
+                initial_correlation_list.append(initial_correlation)
+                image_subset = shift.shift2d(image_subset, -xoff, -yoff)
+                final_correlation = corr2(image_ref_subset, image_subset)
+                final_correlation_list.append(final_correlation)
         return image
-
 
     def stitch_images(self, image):
         """ Stitch neighboring tiles in an orderly fashion
