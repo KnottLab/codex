@@ -112,8 +112,9 @@ class ProcessCodex:
         Returns:
             image: Image with background subtracted
         """
-        background_1 = image[background_1 > image]
-        background_2 = image[background_2 > image]
+        print("Background subtraction started for cycle {0} and channel {1}".format(cycle, channel))        
+        background_1[background_1 > image] = image[background_1 > image]
+        background_2[background_2 > image] = image[background_2 > image]
         kernel_1 = octagon(1, 1)
         image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel_1)
         background_1 = cv2.morphologyEx(background_1, cv2.MORPH_CLOSE, kernel_1)
@@ -122,7 +123,7 @@ class ProcessCodex:
         image = cv2.morphologyEx(image, cv2.MORPH_TOPHAT, kernel_2)
         background_1 = cv2.morphologyEx(background_1, cv2.MORPH_TOPHAT, kernel_2)
         background_2 = cv2.morphologyEx(background_2, cv2.MORPH_TOPHAT, kernel_2)
-        a = (self.codex_object.metadata['ncl'] - cycle - 1) / (self.codex_object['metadata'] - 3)
+        a = (self.codex_object.metadata['ncl'] - cycle - 1) / (self.codex_object.metadata['ncl'] - 3)
         b = 1 - a
         image = image  - a*background_1 - b*background_2
         image = image + 1
@@ -151,13 +152,15 @@ class ProcessCodex:
                 image_subset = image[x*width:(x+1)*width, y*width:(y+1)*width]
                 print(image_subset.shape)
                 xoff,yoff,exoff,eyoff = chi2_shift(image_ref_subset, image_subset, return_error=True, upsample_factor='auto')
-                shift_list.append([xoff, yoff])
+                shift_list.append((xoff, yoff))
                 initial_correlation = corr2(image_subset, image_ref_subset)
                 initial_correlation_list.append(initial_correlation)
                 image_subset = shift.shift2d(image_subset, -xoff, -yoff)
                 final_correlation = corr2(image_subset, image_ref_subset)
                 final_correlation_list.append(final_correlation)
-
+        
+        print("Shift list size is: " + str(len(shift_list)))
+        print(shift_list)
         cycle_alignment_info = {"shift": shift_list, "initial_correlation": initial_correlation_list, "final_correlation": final_correlation_list}
         return cycle_alignment_info, image
 
@@ -177,18 +180,17 @@ class ProcessCodex:
         """
         print("Applying cycle alignment")
         width = self.codex_object.metadata['width']
-        shift_list = np.array(cycle_alignment_info.get('shift'))
-        shift_array = shift_list.reshape(self.codex_object.metadata['nx'], self.codex_object.metadata['ny'])
+        shift_list = cycle_alignment_info.get('shift')
         initial_correlation_list = []
         final_correlation_list = []
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
-               shift = shift_array[x][y]
+               xoff, yoff = shift_list[x + 3 * y]
                image_ref_subset = image_ref[x*width:(x+1)*width, y*width:(y+1)*width]
                image_subset = image[x*width:(x+1)*width, y*width:(y+1)*width]  
                initial_correlation = corr2(image_ref_subset, image_subset)
                initial_correlation_list.append(initial_correlation)
-               image_subset = shift.shift2d(image_subset, -shift[0], -shift[1])
+               image_subset = shift.shift2d(image_subset, -xoff, -yoff)
                final_correlation = corr2(image_ref_subset, image_subset)
                final_correlation_list.append(final_correlation)
         return image
