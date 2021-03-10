@@ -56,8 +56,8 @@ class XMLDecoder:
                 overlap_x = float(stitch.get('OverlapPercentageX'))
                 overlap_y = float(stitch.get('OverlapPercentageY'))
 
-        overlap_width = math.floor((1 - overlap_x) * width)
-        overlap_height = math.floor((1 - overlap_y) * height)
+        overlap_width = width - math.floor((1 - overlap_x) * width)
+        overlap_height = height - math.floor((1 - overlap_y) * height)
 
         return width, height, overlap_x, overlap_y, overlap_width, overlap_height
 

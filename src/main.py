@@ -87,10 +87,8 @@ if __name__ == '__main__':
                         codex_object.metadata['marker_names_array'][cycle][channel]), image)
 
             print("Stitching started")
-            overlap_width = codex_object.metadata['ox']
-            stitching_width = codex_object.metadata['width']
-            print("Stitching width", stitching_width)
-            tiles = stitching_object.start_stitching(image, stitching_width)
+            tiles = stitching_object.start_stitching(image, image_width=codex_object.metadata['tileWidth'],
+                                                     overlap_width=codex_object.metadata['width'])
             print("Stitching done")
             with open("tiles.pkl", "wb") as f:
                 pkl.dump(tiles, f)

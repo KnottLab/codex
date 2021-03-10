@@ -28,16 +28,17 @@ class Stitching:
     #     print("Finding the first tile")
     #     max_correlation = 0
     #     for tile in self._tiles[1:len(self._tiles)-1]:
-    #        correlation = tile.registration_details
+    #         coorelation_list = []
+    #         for registration in tile.registration_details:
 
-    def start_stitching(self, image, width):
+    def start_stitching(self, image, image_width, overlap_width):
         # Step 1: calculate neighbors for each tile
         self._tiles = self.calculate_neighbors()
         for tile in self._tiles:
             registration_transform_list = list()
             for neighbor in tile.neighbors:
                 initial_corr, final_corr, xoff, yoff = self.get_registration_transform(tile.x, tile.y, neighbor[0],
-                                                                                       neighbor[1], image, width)
+                                                                                       neighbor[1], image, image_width, overlap_width)
                 registration_transform = {"initial_correlation": initial_corr, "final_correlation": final_corr, "xoff": xoff, "yoff": yoff}
                 registration_transform_list.append(registration_transform)
 
@@ -47,10 +48,10 @@ class Stitching:
 
 
 
-    def get_registration_transform(self, x1, y1, x2, y2, image, width):
+    def get_registration_transform(self, x1, y1, x2, y2, image, image_width, overlap_width):
         """Get transform that maximizes correlation between overlaping regions."""
-        tile_1 = image[x1 * width:(x1 + 1) * width, y1 * width:(y1 + 1) * width]
-        tile_2 = image[x2 * width:(x2 + 1) * width, y2 * width:(y2 + 1) * width]
+        tile_1 = image[x1 * image_width:(x1 + 1) * image_width, y1 * image_width:(y1 + 1) * image_width]
+        tile_2 = image[x2 * image_width:(x2 + 1) * image_width, y2 * image_width:(y2 + 1) * image_width]
         overlap_tile_1 = tile_1
         overlap_tile_2 = tile_2
 
@@ -59,17 +60,17 @@ class Stitching:
 
         # Get overlaps
         if x2 > x1:
-           overlap_tile_1 = tile_1[-width:, :]
-           overlap_tile_2 = tile_2[:width, :]
+            overlap_tile_1 = tile_1[image_width - overlap_width:, :]
+            overlap_tile_2 = tile_2[:overlap_width, :]
         elif x2 < x1:
-           overlap_tile_1 = tile_1[:width, :]
-           overlap_tile_2 = tile_2[-width:, :]
+            overlap_tile_1 = tile_1[:overlap_width, :]
+            overlap_tile_2 = tile_2[image_width - overlap_width:, :]
         elif y2 > y1:
-           overlap_tile_1 = tile_1[:, -width:]
-           overlap_tile_2 = tile_2[:, :width]
+            overlap_tile_1 = tile_1[:, image_width - overlap_width:]
+            overlap_tile_2 = tile_2[:, :overlap_width]
         elif y2 < y1:
-           overlap_tile_1 = tile_1[:, :width]
-           overlap_tile_2 = tile_2[:, -width:]
+            overlap_tile_1 = tile_1[:, :overlap_width]
+            overlap_tile_2 = tile_2[:, image_width - overlap_width:]
 
         print(overlap_tile_1.shape, overlap_tile_2.shape) 
         initial_correlation = corr2(overlap_tile_1, overlap_tile_2)
