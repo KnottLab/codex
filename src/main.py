@@ -54,10 +54,10 @@ if __name__ == '__main__':
     stitching_object = stitching.Stitching(codex_object)
 
     image_ref = None
-    cycle_range = [0, codex_object.metadata['ncl'] - 1, 1]
+    cycle_range = [0]
     print("Cycle range is: " + str(cycle_range))
 
-    for channel in range(codex_object.metadata['nch']):
+    for channel in range(1):
         for cycle, cycle_index in zip(cycle_range, range(codex_object.metadata['ncl'])):
             image = process_codex.apply_edof(cycle, channel)
             print("EDOF done. Saving file.")
@@ -87,7 +87,10 @@ if __name__ == '__main__':
                         codex_object.metadata['marker_names_array'][cycle][channel]), image)
 
             print("Stitching started")
-            tiles = stitching_object.start_stitching(image, 2048)
+            overlap_width = codex_object.metadata['ox']
+            stitching_width = codex_object.metadata['width']
+            print("Stitching width", stitching_width)
+            tiles = stitching_object.start_stitching(image, stitching_width)
             print("Stitching done")
             with open("tiles.pkl", "wb") as f:
                 pkl.dump(tiles, f)

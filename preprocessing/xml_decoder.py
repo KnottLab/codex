@@ -47,7 +47,7 @@ class XMLDecoder:
         overlap_x = 0
         overlap_y = 0
 
-        attachments = root.find('Element').find('Data').find('Image').findall('Attachments')
+        attachments = root.find('Element').find('Data').find('Image').findall('Attachment')
         for a in attachments:
             if a.get("Name") == "HardwareSetting":
                 atl = a.find("ATLCameraSettingDefinition")

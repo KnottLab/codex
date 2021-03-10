@@ -33,8 +33,8 @@ class Stitching:
     def start_stitching(self, image, width):
         # Step 1: calculate neighbors for each tile
         self._tiles = self.calculate_neighbors()
-        registration_transform_list = list()
         for tile in self._tiles:
+            registration_transform_list = list()
             for neighbor in tile.neighbors:
                 initial_corr, final_corr, xoff, yoff = self.get_registration_transform(tile.x, tile.y, neighbor[0],
                                                                                        neighbor[1], image, width)
@@ -54,27 +54,32 @@ class Stitching:
         overlap_tile_1 = tile_1
         overlap_tile_2 = tile_2
 
+        print(tile_1.shape, tile_2.shape)
+        
+
         # Get overlaps
         if x2 > x1:
-            overlap_tile_1 = tile_1[-width:, :]
-            overlap_tile_2 = tile_2[:width, :]
+           overlap_tile_1 = tile_1[-width:, :]
+           overlap_tile_2 = tile_2[:width, :]
         elif x2 < x1:
-            overlap_tile_1 = tile_1[:width, :]
-            overlap_tile_2 = tile_2[-width:, :]
+           overlap_tile_1 = tile_1[:width, :]
+           overlap_tile_2 = tile_2[-width:, :]
         elif y2 > y1:
-            overlap_tile_1 = tile_1[:, -width:]
-            overlap_tile_2 = tile_2[:, width:]
+           overlap_tile_1 = tile_1[:, -width:]
+           overlap_tile_2 = tile_2[:, :width]
         elif y2 < y1:
-            overlap_tile_1 = tile_1[:, width:]
-            overlap_tile_2 = tile_2[:, -width:]
+           overlap_tile_1 = tile_1[:, :width]
+           overlap_tile_2 = tile_2[:, -width:]
 
+        print(overlap_tile_1.shape, overlap_tile_2.shape) 
+        initial_correlation = corr2(overlap_tile_1, overlap_tile_2)
         xoff, yoff, xeoff, yeoff = chi2_shift(overlap_tile_1, overlap_tile_2, return_error=True, upsample_factor='auto')
         shifted_image = shift.shift2d(overlap_tile_2, -xoff, -yoff)
+        
 
-        initial_correlation = corr2(overlap_tile_1, overlap_tile_2)
         print("Before shifting the correlation is {0}".format(initial_correlation))
 
-        warped_correlation = corr2(overlap_tile_1[shifted_image > 0], overlap_tile_2[shifted_image > 0])
+        warped_correlation = corr2(overlap_tile_1[shifted_image > 0], shifted_image[shifted_image > 0])
         print("Warped correlation is {0}".format(warped_correlation))
 
         return initial_correlation, warped_correlation, -xoff, -yoff
@@ -88,7 +93,7 @@ class Stitching:
         tiles = []
         for x in range(range_x):
             for y in range(range_y):
-                neighbor_image = np.zeros(range_x, range_y)
+                neighbor_image = np.zeros((range_x, range_y))
                 neighbor_image[x, y] = 1
                 print("Neighbor image is: " + str(neighbor_image))
                 kernel = octagon(1, 1)
