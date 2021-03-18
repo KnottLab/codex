@@ -24,29 +24,108 @@ class Stitching:
         self.codex_object = codex_object
         self._tiles = []
 
-    # def find_first_tile(self):
-    #     print("Finding the first tile")
-    #     max_correlation = 0
-    #     for tile in self._tiles[1:len(self._tiles)-1]:
-    #         coorelation_list = []
-    #         for registration in tile.registration_details:
+    @property
+    def tiles(self):
+        return self._tiles
 
-    def start_stitching(self, image, image_width, overlap_width):
+    @tiles.setter
+    def tiles(self, value):
+        self._tiles = value
+
+    @tiles.deleter
+    def tiles(self):
+        del self._tiles
+
+    def stitch_first_tile(self, first_tile, image, image_width, overlap_width):
+        image_subset = image[first_tile.x * image_width:(first_tile.x + 1) * image_width,
+                       first_tile.y * image_width:(first_tile.y + 1) * image_width]
+        j = np.zeros((self.codex_object.metadata['nx'] * (image_width - overlap_width) + overlap_width,
+                     self.codex_object['ny'] * (image_width - overlap_width) + overlap_width))
+        m = np.zeros((self.codex_object.metadata['nx'] * (image_width - overlap_width) + overlap_width,
+                     self.codex_object['ny'] * (image_width - overlap_width) + overlap_width))
+        j[first_tile.x * (image_width - overlap_width):first_tile.x + 1 * (image_width - overlap_width) + overlap_width,
+        first_tile.y * (image_width - overlap_width): first_tile.y + 1 * (
+                    image_width - overlap_width) + overlap_width] = image_subset
+
+        m[first_tile.x * (image_width - overlap_width): first_tile.x + 1 * (image_width - overlap_width) + overlap_width,
+        first_tile.y * (image_width - overlap_width): first_tile.y + 1 * (
+                    image_width - overlap_width) + overlap_width] = np.ones(image_subset.shape)
+
+        mask = np.zeros((self.codex_object['nx'], self.codex_object['ny']))
+        mask[first_tile.x, first_tile.y] = 1
+
+        v = np.zeros(first_tile.x, first_tile.y)
+
+        return j, m, mask, v
+
+    def find_first_tile(self):
+        print("Finding the first tile")
+        max_correlation = 0
+        first_tile = self._tiles[0]
+        for tile in self._tiles[1:len(self._tiles) - 1]:
+            correlation_list = []
+            for registration in tile.registration_details:
+                correlation = registration.get('final_correlation')
+                correlation_list.append(correlation)
+            avg_correlation = np.mean(correlation_list)
+            if avg_correlation > max_correlation:
+                max_correlation = avg_correlation
+                first_tile = tile
+
+        return first_tile
+
+    def stitch_tiles(self, image, image_width, overlap_width, j, m, mask, x_2, y_2, x_off, y_off):
+        image_subset = image[x_2*image_width : (x_2 + 1) * image_width, y_2 * image_width : (y_2 + 1) * image_width]
+        # this line is different from matlab, the matlab code uses imref2d to define co-ordinates
+        warped_image = shift.shift2d(image_subset, -x_off, -y_off)
+        dx = list(range(x_2 * (image_width - overlap_width), (x_2 + 1) * (image_width - overlap_width) + overlap_width))
+        dx = [x + y_off for x in dx]
+        dy = list(range(y_2 * (image_width - overlap_width), (y_2 + 1) * (image_width - overlap_width) + overlap_width))
+        dy = [y + x_off for y in dy]
+        if max(dx) > j.shape[0]:
+            j = np.concatenate((j, np.zeros((max(dx) - j.shape[0], j.shape[1]))))
+        if max(dy) > j.shape[1]:
+            j = np.concatenate((j, np.zeros((j.shape[0], max(dy) - j.shape[1]))), 1)
+
+        j[dx, dy] = j[dx, dy] + warped_image.astype('uint16') * (j[dx, dy] == 0).astype('uint16')
+        mask[x_2, y_2] = 1
+
+        return j, m, mask
+
+    def find_tile_pairs(self, mask):
+        tile_indices = np.argwhere(mask > 0)
+        max_correlation = 0
+        x_1, y_1, x_2, y_2 = 0, 0, 0, 0
+        for index in tile_indices:
+            x, y = index
+            neighbor_indices = self._tiles[x + y * self.codex_object['ny']].neighbors
+            registration_details = self._tiles[x + y * self.codex_object['ny']].registration_details
+            for i, neighbor in enumerate(neighbor_indices):
+                x_n, y_n = neighbor
+                registration = registration_details[i]
+                correlation = registration.get('final_correlation')
+                if correlation > max_correlation and mask[x, y] == 1 and mask[x_n, y_n] == 0:
+                    max_correlation = correlation
+                    x_1, y_1 = x, y
+                    x_2, y_2 = x_n, y_n
+        return x_1, y_1, x_2, y_2
+
+    def init_stitching(self, image, image_width, overlap_width):
         # Step 1: calculate neighbors for each tile
         self._tiles = self.calculate_neighbors()
         for tile in self._tiles:
             registration_transform_list = list()
             for neighbor in tile.neighbors:
                 initial_corr, final_corr, xoff, yoff = self.get_registration_transform(tile.x, tile.y, neighbor[0],
-                                                                                       neighbor[1], image, image_width, overlap_width)
-                registration_transform = {"initial_correlation": initial_corr, "final_correlation": final_corr, "xoff": xoff, "yoff": yoff}
+                                                                                       neighbor[1], image, image_width,
+                                                                                       overlap_width)
+                registration_transform = {"initial_correlation": initial_corr, "final_correlation": final_corr,
+                                          "xoff": xoff, "yoff": yoff}
                 registration_transform_list.append(registration_transform)
 
             tile.registration_details = registration_transform_list
 
         return self._tiles
-
-
 
     def get_registration_transform(self, x1, y1, x2, y2, image, image_width, overlap_width):
         """Get transform that maximizes correlation between overlaping regions."""
@@ -56,7 +135,6 @@ class Stitching:
         overlap_tile_2 = tile_2
 
         print(tile_1.shape, tile_2.shape)
-        
 
         # Get overlaps
         if x2 > x1:
@@ -72,11 +150,10 @@ class Stitching:
             overlap_tile_1 = tile_1[:, :overlap_width]
             overlap_tile_2 = tile_2[:, image_width - overlap_width:]
 
-        print(overlap_tile_1.shape, overlap_tile_2.shape) 
+        print(overlap_tile_1.shape, overlap_tile_2.shape)
         initial_correlation = corr2(overlap_tile_1, overlap_tile_2)
         xoff, yoff, xeoff, yeoff = chi2_shift(overlap_tile_1, overlap_tile_2, return_error=True, upsample_factor='auto')
         shifted_image = shift.shift2d(overlap_tile_2, -xoff, -yoff)
-        
 
         print("Before shifting the correlation is {0}".format(initial_correlation))
 

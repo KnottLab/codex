@@ -54,6 +54,7 @@ if __name__ == '__main__':
     stitching_object = stitching.Stitching(codex_object)
 
     image_ref = None
+    first_tile = None
     cycle_range = [0]
     print("Cycle range is: " + str(cycle_range))
 
@@ -87,9 +88,18 @@ if __name__ == '__main__':
                         codex_object.metadata['marker_names_array'][cycle][channel]), image)
 
             print("Stitching started")
-            tiles = stitching_object.start_stitching(image, image_width=codex_object.metadata['tileWidth'],
-                                                     overlap_width=codex_object.metadata['width'])
+            if channel == 0 and cycle == 0:
+                tiles = stitching_object.init_stitching(image, image_width=codex_object.metadata['tileWidth'],
+                                                        overlap_width=codex_object.metadata['width'])
+                with open("tiles.pkl", "wb") as f:
+                    pkl.dump(tiles, f)
+                first_tile = stitching_object.find_first_tile()
+
+            j, m, mask, v = stitching_object.stitch_first_tile(first_tile, image, codex_object.metadata['tileWidth'],
+                                                               codex_object.metadata['width'])
+
+
             print("Stitching done")
-            with open("tiles.pkl", "wb") as f:
-                pkl.dump(tiles, f)
+            with open("first_tile.pkl", "wb") as f:
+                pkl.dump(f, first_tile)
             print("Stitching file saved")
