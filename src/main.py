@@ -29,7 +29,12 @@ if __name__ == '__main__':
     cycle_folders = cycle_folders[1:]
 
     xml_file_path = list(base_path.glob('*.xml'))
-    xlif_file_path = cycle_folders[0] / 'Metadata' / 'TileScan 1.xlif'
+    if codex_object.region == 0:
+        xlif_file_path = cycle_folders[0] / 'Metadata' / 'TileScan 1.xlif'
+    else:
+        xlif_file_path = cycle_folders[0] / 'TileScan 1' / 'Metadata' / f'Region {codex_object.region}.xlif'
+        if xlif_file_path.exists():
+            xlif_file_path = cycle_folders[0] / 'TileScan 1' / 'Metadata' / f'Position {codex_object.region}.xlif'
 
     print("XLIF file path is: " + str(xlif_file_path))
     print("XML file path is: " + str(xml_file_path))
