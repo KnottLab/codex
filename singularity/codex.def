@@ -1,0 +1,9 @@
+Bootstrap: docker
+From: ubuntu:20.04
+
+%post
+    apt-get update && apt-get install -y python3 python3-pip
+    pip3 install numpy pandas scikit-learn scikit-image scipy ray opencv-python
+
+%labels
+    Author Nathan.Ing@cshs.org
