@@ -32,23 +32,24 @@ def num2str(x, version='1'):
 
 def read_tile_at_z(codex_obj, cl, ch, x, y, z):
     if codex_obj.metadata['cycle_folders']:
-        # Areas consisting of a single tile are called 'Position' instead of 'Region'
-        if codex_obj.metadata['Ntiles'] == 1: 
-            path = str(codex_obj.metadata['cycle_folders'][
-                cl]) + '/TileScan 1--Z' + num2str(z, version='2') + '--C' + f'{ch:03d}' + '.tif'
-
-        elif codex_obj.region == '0':
+        if codex_obj.region == '0':
             path = str(codex_obj.metadata['cycle_folders'][
                 cl]) + '/TileScan 1--Stage' + num2str(x * (codex_obj.metadata['ny'] + 1) + y,
                                                     version='2') + '--Z' + num2str(z, version='2') + '--C' + num2str(
                 ch, version='2') + '.tif'
         
         else:
-            path = str(codex_obj.metadata['cycle_folders'][cl]) + \
-                '/TileScan 1/Region ' + codex_obj.region +\
-                '--Stage' + codex_obj.metadata['real_tiles'][x,y] + \
-                '--Z' + f'{z:03d}' + \
-                '--C' + f'{ch:03d}' + '.tif'
+            # Areas consisting of a single tile are called 'Position' instead of 'Region', and have no --StageXX field
+            if codex_obj.metadata['Ntiles'] == 1: 
+                path = str(codex_obj.metadata['cycle_folders'][cl]) + \
+                    '/TileScan 1/Position ' + codex_obj.region + \
+                    '--Z' + f'{z:03d}' + '--C' + f'{ch:03d}' + '.tif'
+            else:
+                path = str(codex_obj.metadata['cycle_folders'][cl]) + \
+                    '/TileScan 1/Region ' + codex_obj.region +\
+                    '--Stage' + codex_obj.metadata['real_tiles'][x,y] + \
+                    '--Z' + f'{z:03d}' + \
+                    '--C' + f'{ch:03d}' + '.tif'
 
     else:
         path = codex_obj.data_path + '/' + codex_obj.sample_id + '/cyc' + num2str(cl) + '_reg00' + num2str(
