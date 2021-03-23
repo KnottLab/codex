@@ -6,6 +6,7 @@ from image_registration import chi2_shift
 from image_registration.fft_tools import shift
 from skimage.morphology import octagon
 import cv2
+from pybasic.pybasic import basic
 
 
 class ProcessCodex:
@@ -195,6 +196,24 @@ class ProcessCodex:
                 image_subset = shift.shift2d(image_subset, -xoff, -yoff)
                 final_correlation = corr2(image_ref_subset, image_subset)
                 final_correlation_list.append(final_correlation)
+        return image
+
+    def shading_correction(self, image, cycle, channel):
+        image_list = []
+        print("Shading correction started for cycle {} and channel {}".format(cycle, channel))
+        width = self.codex_object.metadata['width']
+        for x in range(self.codex_object.metadata['nx']):
+            for y in range(self.codex_object.metadata['ny']):
+                image_subset = image[x * width : (x + 1) * width, y * width : (y + 1) * width]
+                image_list.append(image_subset)
+        image_array = np.array(image_list)
+        flatfield, darkfield = basic(images=image_array, segmentation=None)
+        print("Flatfield has shape {} and darkfield has shape {}".format(flatfield.shape, darkfield.shape))
+        for x in range(self.codex_object.metadata['nx']):
+            for y in range(self.codex_object.metadata['ny']):
+                image_subset = image[x * width, (x + 1) * width, y * width: (y + 1) * width]
+                image_subset = ((image_subset.astype('double') - darkfield) / flatfield).astype('uint16')
+
         return image
 
     def stitch_images(self, image):

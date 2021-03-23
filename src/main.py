@@ -10,6 +10,7 @@ import pandas as pd
 from pathlib import Path
 import numpy as np
 import pickle as pkl
+import sys
 
 if __name__ == '__main__':
 
@@ -63,6 +64,14 @@ if __name__ == '__main__':
             image = process_codex.apply_edof(cycle, channel)
             print("EDOF done. Saving file.")
             np.save(file='edof.npy', arr=image)
+
+            print("Shading correction reached")
+
+            image = process_codex.shading_correction(image, cycle, channel)
+            np.save(file='shading_correction.npy', arr=image)
+
+            print('Shading correction ended')
+            sys.exit()
 
             if channel == 0 and cycle == 0:
                 image_ref = image
