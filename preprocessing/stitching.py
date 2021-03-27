@@ -40,21 +40,21 @@ class Stitching:
         image_subset = image[first_tile.x * image_width:(first_tile.x + 1) * image_width,
                        first_tile.y * image_width:(first_tile.y + 1) * image_width]
         j = np.zeros((self.codex_object.metadata['nx'] * (image_width - overlap_width) + overlap_width,
-                     self.codex_object['ny'] * (image_width - overlap_width) + overlap_width))
+                     self.codex_object.metadata['ny'] * (image_width - overlap_width) + overlap_width))
         m = np.zeros((self.codex_object.metadata['nx'] * (image_width - overlap_width) + overlap_width,
-                     self.codex_object['ny'] * (image_width - overlap_width) + overlap_width))
-        j[first_tile.x * (image_width - overlap_width):first_tile.x + 1 * (image_width - overlap_width) + overlap_width,
-        first_tile.y * (image_width - overlap_width): first_tile.y + 1 * (
+                     self.codex_object.metadata['ny'] * (image_width - overlap_width) + overlap_width))
+        j[first_tile.x * (image_width - overlap_width):(first_tile.x + 1) * (image_width - overlap_width) + overlap_width,
+        first_tile.y * (image_width - overlap_width): (first_tile.y + 1) * (
                     image_width - overlap_width) + overlap_width] = image_subset
 
-        m[first_tile.x * (image_width - overlap_width): first_tile.x + 1 * (image_width - overlap_width) + overlap_width,
-        first_tile.y * (image_width - overlap_width): first_tile.y + 1 * (
+        m[first_tile.x * (image_width - overlap_width): (first_tile.x + 1) * (image_width - overlap_width) + overlap_width,
+        first_tile.y * (image_width - overlap_width): (first_tile.y + 1) * (
                     image_width - overlap_width) + overlap_width] = np.ones(image_subset.shape)
 
-        mask = np.zeros((self.codex_object['nx'], self.codex_object['ny']))
+        mask = np.zeros((self.codex_object.metadata['nx'], self.codex_object.metadata['ny']))
         mask[first_tile.x, first_tile.y] = 1
 
-        v = np.zeros(first_tile.x, first_tile.y)
+        v = np.zeros((first_tile.x, first_tile.y))
 
         return j, m, mask, v
 
@@ -98,8 +98,8 @@ class Stitching:
         x_1, y_1, x_2, y_2 = 0, 0, 0, 0
         for index in tile_indices:
             x, y = index
-            neighbor_indices = self._tiles[x + y * self.codex_object['ny']].neighbors
-            registration_details = self._tiles[x + y * self.codex_object['ny']].registration_details
+            neighbor_indices = self._tiles[x + y * self.codex_object.metadata['ny']].neighbors
+            registration_details = self._tiles[x + y * self.codex_object.metadata['ny']].registration_details
             for i, neighbor in enumerate(neighbor_indices):
                 x_n, y_n = neighbor
                 registration = registration_details[i]
