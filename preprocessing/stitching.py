@@ -54,9 +54,7 @@ class Stitching:
         mask = np.zeros((self.codex_object.metadata['nx'], self.codex_object.metadata['ny']))
         mask[first_tile.x, first_tile.y] = 1
 
-        v = np.zeros((first_tile.x, first_tile.y))
-
-        return j, m, mask, v
+        return j, m, mask
 
     def find_first_tile(self):
         print("Finding the first tile")
@@ -74,14 +72,15 @@ class Stitching:
 
         return first_tile
 
-    def stitch_tiles(self, image, image_width, overlap_width, j, m, mask, x_2, y_2, x_off, y_off):
+    def stitch_tiles(self, image, image_width, overlap_width, j, mask, tile_2, x_off, y_off):
+        x_2, y_2 = tile_2.x, tile_2.y
         image_subset = image[x_2*image_width : (x_2 + 1) * image_width, y_2 * image_width : (y_2 + 1) * image_width]
         # this line is different from matlab, the matlab code uses imref2d to define co-ordinates
         warped_image = shift.shift2d(image_subset, -x_off, -y_off)
         dx = list(range(x_2 * (image_width - overlap_width), (x_2 + 1) * (image_width - overlap_width) + overlap_width))
-        dx = [x + y_off for x in dx]
+        dx = [x + x_off for x in dx]
         dy = list(range(y_2 * (image_width - overlap_width), (y_2 + 1) * (image_width - overlap_width) + overlap_width))
-        dy = [y + x_off for y in dy]
+        dy = [y + y_off for y in dy]
         if max(dx) > j.shape[0]:
             j = np.concatenate((j, np.zeros((max(dx) - j.shape[0], j.shape[1]))))
         if max(dy) > j.shape[1]:
@@ -90,25 +89,28 @@ class Stitching:
         j[dx, dy] = j[dx, dy] + warped_image.astype('uint16') * (j[dx, dy] == 0).astype('uint16')
         mask[x_2, y_2] = 1
 
-        return j, m, mask
+        return j, mask
 
     def find_tile_pairs(self, mask):
         tile_indices = np.argwhere(mask > 0)
         max_correlation = 0
-        x_1, y_1, x_2, y_2 = 0, 0, 0, 0
+        registration = None
+        tile_1, tile_2 = None, None
         for index in tile_indices:
             x, y = index
-            neighbor_indices = self._tiles[x + y * self.codex_object.metadata['ny']].neighbors
-            registration_details = self._tiles[x + y * self.codex_object.metadata['ny']].registration_details
+            temp_tile_1 = self._tiles[x + y * self.codex_object.metadata['ny']]
+            neighbor_indices = temp_tile_1.neighbors
+            registration_details = temp_tile_1.registration_details
             for i, neighbor in enumerate(neighbor_indices):
                 x_n, y_n = neighbor
+                temp_tile_2 = self._tiles[x_n + y_n * self.codex_object.metadata['ny']]
                 registration = registration_details[i]
                 correlation = registration.get('final_correlation')
                 if correlation > max_correlation and mask[x, y] == 1 and mask[x_n, y_n] == 0:
                     max_correlation = correlation
-                    x_1, y_1 = x, y
-                    x_2, y_2 = x_n, y_n
-        return x_1, y_1, x_2, y_2
+                    tile_1 = temp_tile_1
+                    tile_2 = temp_tile_2
+        return tile_1, tile_2, registration
 
     def init_stitching(self, image, image_width, overlap_width):
         # Step 1: calculate neighbors for each tile
@@ -160,7 +162,7 @@ class Stitching:
         warped_correlation = corr2(overlap_tile_1[shifted_image > 0], shifted_image[shifted_image > 0])
         print("Warped correlation is {0}".format(warped_correlation))
 
-        return initial_correlation, warped_correlation, -xoff, -yoff
+        return initial_correlation, warped_correlation, xoff, yoff
 
     def calculate_neighbors(self):
         """Calculate neighbors using the imdilate function.

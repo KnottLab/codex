@@ -10,6 +10,21 @@ class Tile:
         self.x = x
         self.y = y
         self._registration_details = None
+        self._stitching_index = 0
+        self.x_off = 0
+        self.y_off = 0
+
+    @property
+    def stitching_index(self):
+        return self._stitching_index
+
+    @stitching_index.setter
+    def stitching_index(self, value):
+        self._stitching_index = value
+
+    @stitching_index.deleter
+    def stitching_index(self):
+        del self._stitching_index
 
     @property
     def registration_details(self):
