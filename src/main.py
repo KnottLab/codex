@@ -62,14 +62,16 @@ if __name__ == '__main__':
 
     for channel in range(1):
         for cycle, cycle_index in zip(cycle_range, range(codex_object.metadata['ncl'])):
-            image = process_codex.apply_edof(cycle, channel)
+            # image = process_codex.apply_edof(cycle, channel)
             print("EDOF done. Saving file.")
-            np.save(file='edof.npy', arr=image)
+            image = np.load('edof.npy')
+            # np.save(file='edof.npy', arr=image)
 
             print("Shading correction reached")
 
-            image = process_codex.shading_correction(image, cycle, channel)
-            np.save(file='shading_correction.npy', arr=image)
+            # image = process_codex.shading_correction(image, cycle, channel)
+            # np.save(file='shading_correction.npy', arr=image)
+            image = np.load('shading_correction.npy')
 
             if channel == 0 and cycle == 0:
                 image_ref = image
@@ -123,5 +125,5 @@ if __name__ == '__main__':
 
             print("Stitching done")
             with open("stitch.pkl", "wb") as f:
-                pkl.dump(f, j)
+                pkl.dump(j, f, -1)
             print("Stitching file saved")
