@@ -114,6 +114,12 @@ if __name__ == '__main__':
                     tile_2.stitching_index = k
                     j, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], codex_object.metadata['width'], j, mask, tile_2,
                                                             tile_2.x_off, tile_2.y_off)
+            else:
+                tiles = stitching_object.tiles
+                tiles.sort(key=lambda t:t.stitching_index)
+                print('Tiles array is {0}'.format(tiles))
+                for tile in tiles:
+                    j, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], codex_object.metadata['width'], j, None, tile, tile.x_off, tile.y_off)
 
             print("Stitching done")
             with open("stitch.pkl", "wb") as f:

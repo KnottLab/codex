@@ -87,7 +87,8 @@ class Stitching:
             j = np.concatenate((j, np.zeros((j.shape[0], max(dy) - j.shape[1]))), 1)
 
         j[dx, dy] = j[dx, dy] + warped_image.astype('uint16') * (j[dx, dy] == 0).astype('uint16')
-        mask[x_2, y_2] = 1
+        if mask:
+            mask[x_2, y_2] = 1
 
         return j, mask
 
