@@ -79,12 +79,15 @@ class ProcessCodex:
                 y_range = range(self.codex_object.metadata['ny'] + 1)
 
             for y in y_range:
+                if self.codex_object.metadata['real_tiles'][x,y] == 'x':
+                    continue
+
                 print("Processing : " + self.codex_object.metadata['marker_names_array'][cl][ch] + " CL: " + str(
                     cl) + " CH: " + str(ch) + " X: " + str(x) + " Y: " + str(y))
                 image_s = np.zeros((self.codex_object.metadata['tileWidth'], self.codex_object.metadata['tileWidth'],
                                     self.codex_object.metadata['nz']))
 
-                if self.codex_object.metadata['real_tiles'][x,y] != '':
+                if self.codex_object.metadata['real_tiles'][x,y] != 'x':
                     for z in range(self.codex_object.metadata['nz']):
                         image = read_tile_at_z(self.codex_object, cl, ch, x, y, z)
                         if image is None:
@@ -153,7 +156,7 @@ class ProcessCodex:
         print("Calculating cycle alignment")
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
-                if self.codex_object.metadata['real_tiles'][x,y] == '':
+                if self.codex_object.metadata['real_tiles'][x,y] == 'x':
                     continue
                 image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
@@ -193,8 +196,7 @@ class ProcessCodex:
         final_correlation_list = []
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
-
-                if self.codex_object.metadata['real_tiles'][x,y] == '':
+                if self.codex_object.metadata['real_tiles'][x,y] == 'x':
                     continue
 
                 xoff, yoff = shift_list[x + 3 * y]
@@ -213,6 +215,8 @@ class ProcessCodex:
         width = self.codex_object.metadata['tileWidth']
         for x in range(self.codex_object.metadata['nx'] + 1):
             for y in range(self.codex_object.metadata['ny'] + 1):
+                if self.codex_object.metadata['real_tiles'][x,y] == 'x':
+                    continue
                 image_subset = image[x * width : (x + 1) * width, y * width : (y + 1) * width]
                 image_list.append(image_subset)
         image_array = np.dstack(image_list)
@@ -227,14 +231,3 @@ class ProcessCodex:
                 image[x * width: (x+1) * width, y * width : (y+1) * width] = ((image_subset.astype('double') - darkfield) / flatfield).astype('uint16')
 
         return image + 1
-
-    def stitch_images(self, image, image_width, overlap_width, j, mask, stitching_object, cycle, channel):
-        """ Stitch neighboring tiles in an orderly fashion
-
-        Args:
-            image: Any channel image
-
-        Returns:
-            aligned_image:
-        """
-        pass

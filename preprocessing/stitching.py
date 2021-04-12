@@ -174,8 +174,7 @@ class Stitching:
         tiles = []
         for x in range(range_x):
             for y in range(range_y):
-
-                if self.codex_object.metadata['real_tiles'][x,y] == '':
+                if self.codex_object.metadata['real_tiles'][x,y] == 'x':
                     continue
 
                 neighbor_image = np.zeros((range_x, range_y))

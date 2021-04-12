@@ -49,7 +49,7 @@ class XMLDecoder:
         y = len(Upy)
 
         real_tiles = np.zeros((x,y), dtype=object)
-        real_tiles[:] = ''
+        real_tiles[:] = 'x'
         # snakes like this:
         # 01 02 03 04
         # 08 07 06 05
