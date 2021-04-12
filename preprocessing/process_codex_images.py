@@ -7,6 +7,8 @@ from image_registration.fft_tools import shift
 from skimage.morphology import octagon
 import cv2
 import ray
+from pybasic.pybasic import basic
+
 
 class ProcessCodex:
     """ Preprocessing modules to prepare CODEX scans for analysis
@@ -78,9 +80,11 @@ class ProcessCodex:
                 y_range = range(self.codex_object.metadata['ny'] + 1)
 
             for y in y_range:
+                if self.codex_object.metadata['real_tiles'][x,y]=='x':
+                    continue
                 print("Building remote function for : " + self.codex_object.metadata['marker_names_array'][cl][ch] + \
                       " CL: " + str(cl) + " CH: " + str(ch) + " X: " + str(x) + " Y: " + str(y))
-                futures.append(edof_loop(self.codex_object, cl, ch, x, y))
+                futures.append(edof_loop.remote(self.codex_object, cl, ch, x, y))
 
         print("Running EDOF functions remotely")
         edof_images = ray.get(futures)
@@ -93,6 +97,8 @@ class ProcessCodex:
                 y_range = range(self.codex_object.metadata['ny'] + 1)
 
             for y in y_range:
+                if self.codex_object.metadata['real_tiles'][x,y]=='x':
+                    continue
                 image = edof_images[k]
                 if images_temp is None: # Build column
                     images_temp = image
@@ -138,17 +144,17 @@ class ProcessCodex:
         image[not (image > 0 and background_1 > 0 and background_2 > 0)] = 0
         return image
 
-    @ray.remote
-    def _get_transform(self, image_ref, image, x, y, width):
-        image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
-        image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
-        print(image_subset.shape)
-        xoff, yoff, exoff, eyoff = chi2_shift(image_ref_subset, image_subset, return_error=True,
-                                                upsample_factor='auto')
+    # @ray.remote
+    # def _get_transform(self, image_ref, image, x, y, width):
+    #     image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
+    #     image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
+    #     print(image_subset.shape)
+    #     xoff, yoff, exoff, eyoff = chi2_shift(image_ref_subset, image_subset, return_error=True,
+    #                                           upsample_factor='auto')
 
-        initial_correlation = corr2(image_subset, image_ref_subset)
-        final_correlation = corr2(image_subset, image_ref_subset)
-        return xoff, yoff, initial_correlation, final_correlation
+    #     initial_correlation = corr2(image_subset, image_ref_subset)
+    #     final_correlation = corr2(image_subset, image_ref_subset)
+    #     return xoff, yoff, initial_correlation, final_correlation
 
     def cycle_alignment_get_transform(self, image_ref, image):
         """ Get and stash a cycle alignment transformation
@@ -160,7 +166,7 @@ class ProcessCodex:
         Args:
             image: A DAPI channel image from any cycle after the first
         """
-        width = self.codex_object.metadata['width']
+        width = self.codex_object.metadata['tileWidth']
         shift_list = []
         initial_correlation_list = []
         final_correlation_list = []
@@ -168,16 +174,16 @@ class ProcessCodex:
         print("Making cycle alignment jobs")
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
-                if self.codex_object.metadata['real_tiles'][x,y] == '':
+                if self.codex_object.metadata['real_tiles'][x,y]=='x':
                     continue
-                futures.append(self._get_transform(image_ref, image, x, y, width))
+                futures.append(get_transform.remote(image_ref, image, x, y, width))
 
         print("Running cycle alignment jobs remotely")
         alignment_info = ray.get(futures)
         k = 0
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
-                if self.codex_object.metadata['real_tiles'][x,y] == '':
+                if self.codex_object.metadata['real_tiles'][x,y]=='':
                     continue
                 xoff, yoff, initial_correlation, final_correlation = alignment_info[k]
 
@@ -210,14 +216,14 @@ class ProcessCodex:
             aligned_image
         """
         print("Applying cycle alignment")
-        width = self.codex_object.metadata['width']
+        width = self.codex_object.metadata['tileWidth']
         shift_list = cycle_alignment_info.get('shift')
         initial_correlation_list = []
         final_correlation_list = []
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
 
-                if self.codex_object.metadata['real_tiles'][x,y] == '':
+                if self.codex_object.metadata['real_tiles'][x,y]=='x':
                     continue
 
                 xoff, yoff = shift_list[x + 3 * y]
@@ -230,13 +236,41 @@ class ProcessCodex:
                 final_correlation_list.append(final_correlation)
         return image
 
-    def stitch_images(self, image):
-        """ Stitch neighboring tiles in an orderly fashion
 
-        Args:
-            image: Any channel image
+    def shading_correction(self, image, cycle, channel):
+        image_list = []
+        print("Shading correction started for cycle {} and channel {}".format(cycle, channel))
+        width = self.codex_object.metadata['tileWidth']
+        for x in range(self.codex_object.metadata['nx']):
+            for y in range(self.codex_object.metadata['ny']):
+                if self.codex_object.metadata['real_tiles'][x,y]=='x':
+                    continue
+                image_subset = image[x * width : (x + 1) * width, y * width : (y + 1) * width]
+                image_list.append(image_subset)
 
-        Returns:
-            aligned_image:
-        """
-        pass
+        image_array = np.dstack(image_list)
+        print("Image array has shape {}".format(image_array.shape))
+        flatfield, darkfield = basic(images=image_array, segmentation=None)
+        print("Flatfield has shape {} and darkfield has shape {}".format(flatfield.shape, darkfield.shape))
+        np.save(file='flatfield.npy', arr=flatfield)
+        np.save(file='darkfield.npy', arr=darkfield)
+
+        for x in range(self.codex_object.metadata['nx']):
+            for y in range(self.codex_object.metadata['ny']):
+                image_subset = image[x * width:(x + 1) * width, y * width: (y + 1) * width]
+                image[x * width: (x+1) * width, y * width : (y+1) * width] = ((image_subset.astype('double') - darkfield) / flatfield).astype('uint16')
+
+        return image + 1
+
+
+@ray.remote
+def get_transform(image_ref, image, x, y, width):
+    image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
+    image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
+    print(image_subset.shape)
+    xoff, yoff, exoff, eyoff = chi2_shift(image_ref_subset, image_subset, return_error=True,
+                                            upsample_factor='auto')
+
+    initial_correlation = corr2(image_subset, image_ref_subset)
+    final_correlation = corr2(image_subset, image_ref_subset)
+    return xoff, yoff, initial_correlation, final_correlation
