@@ -110,7 +110,8 @@ if __name__ == '__main__':
                                                                 codex_object.metadata['tileWidth'],
                                                                 codex_object.metadata['width'])
                 k = 0
-                while not np.all(mask):
+                # while not np.all(mask):
+                while np.sum(mask) < np.sum(codex_object.metadata['real_tiles']!='x'):
                     tile_1, tile_2, registration = stitching_object.find_tile_pairs(mask)
                     tile_2.x_off = registration.get('xoff') + tile_1.x_off
                     tile_2.y_off = registration.get('yoff') + tile_1.y_off
