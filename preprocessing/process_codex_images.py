@@ -228,7 +228,7 @@ class ProcessCodex:
 
         return image + 1
 
-    def stitch_images(self, image):
+    def stitch_images(self, image, image_width, overlap_width, j, mask, stitching_object, cycle, channel):
         """ Stitch neighboring tiles in an orderly fashion
 
         Args:

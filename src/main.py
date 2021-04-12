@@ -61,6 +61,7 @@ if __name__ == '__main__':
 
     image_ref = None
     first_tile = None
+    j = None
     cycle_range = [0]
     print("Cycle range is: " + str(cycle_range))
 
@@ -74,9 +75,6 @@ if __name__ == '__main__':
 
             image = process_codex.shading_correction(image, cycle, channel)
             np.save(file='shading_correction.npy', arr=image)
-
-            print('Shading correction ended')
-            sys.exit()
 
             if channel == 0 and cycle == 0:
                 image_ref = image
@@ -108,12 +106,27 @@ if __name__ == '__main__':
                 with open("tiles.pkl", "wb") as f:
                     pkl.dump(tiles, f)
                 first_tile = stitching_object.find_first_tile()
-
-            j, m, mask, v = stitching_object.stitch_first_tile(first_tile, image, codex_object.metadata['tileWidth'],
-                                                               codex_object.metadata['width'])
-
+                j, m, mask = stitching_object.stitch_first_tile(first_tile, image,
+                                                                codex_object.metadata['tileWidth'],
+                                                                codex_object.metadata['width'])
+                k = 0
+                while not np.all(mask):
+                    tile_1, tile_2, registration = stitching_object.find_tile_pairs(mask)
+                    tile_2.x_off = registration.get('xoff') + tile_1.x_off
+                    tile_2.y_off = registration.get('yoff') + tile_1.y_off
+                    tile_1.stitching_index = k
+                    k += 1
+                    tile_2.stitching_index = k
+                    j, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], codex_object.metadata['width'], j, mask, tile_2,
+                                                            tile_2.x_off, tile_2.y_off)
+            else:
+                tiles = stitching_object.tiles
+                tiles.sort(key=lambda t:t.stitching_index)
+                print('Tiles array is {0}'.format(tiles))
+                for tile in tiles:
+                    j, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], codex_object.metadata['width'], j, None, tile, tile.x_off, tile.y_off)
 
             print("Stitching done")
-            with open("first_tile.pkl", "wb") as f:
-                pkl.dump(f, first_tile)
+            with open("stitch.pkl", "wb") as f:
+                pkl.dump(f, j)
             print("Stitching file saved")
