@@ -1,11 +1,12 @@
 """Class for processing codex images"""
 import numpy as np
 from utilities.utility import read_tile_at_z, corr2
-from .edof import calculate_focus_stack
+from .edof import edof_loop
 from image_registration import chi2_shift
 from image_registration.fft_tools import shift
 from skimage.morphology import octagon
 import cv2
+import ray
 from pybasic.pybasic import basic
 
 
@@ -58,7 +59,7 @@ class ProcessCodex:
     def apply_edof(self, cl, ch, processor='CPU'):
         """ Select in-focus planes from a z-stack
 
-        For each image-bearing tile in a CODEX image, process the z-stack and 
+        For each tile in a CODEX image, load the data, process the z-stack and 
         return the EDOF images concatenated in a pseudo-whole slide image form.
 
         Args:
@@ -69,8 +70,8 @@ class ProcessCodex:
         Returns:
             images (np.uint16): Concatenated images processed by EDOF
         """
-        k = 1
         images = None
+        futures = []
         for x in range(self.codex_object.metadata['nx'] + 1):
             images_temp = None
             if (x + 1) % 2 == 0:
@@ -79,18 +80,27 @@ class ProcessCodex:
                 y_range = range(self.codex_object.metadata['ny'] + 1)
 
             for y in y_range:
-                print("Processing : " + self.codex_object.metadata['marker_names_array'][cl][ch] + " CL: " + str(
-                    cl) + " CH: " + str(ch) + " X: " + str(x) + " Y: " + str(y))
-                image_s = np.zeros((self.codex_object.metadata['tileWidth'], self.codex_object.metadata['tileWidth'],
-                                    self.codex_object.metadata['nz']))
-                for z in range(self.codex_object.metadata['nz']):
-                    image = read_tile_at_z(self.codex_object, cl, ch, x, y, z)
-                    if image is None:
-                        raise Exception("Image at above path isn't present")
-                    image_s[:, :, z] = image
+                if self.codex_object.metadata['real_tiles'][x,y]=='x':
+                    continue
+                print("Building remote function for : " + self.codex_object.metadata['marker_names_array'][cl][ch] + \
+                      " CL: " + str(cl) + " CH: " + str(ch) + " X: " + str(x) + " Y: " + str(y))
+                futures.append(edof_loop.remote(self.codex_object, cl, ch, x, y))
 
-                image = calculate_focus_stack(image_s)
-                if images_temp is None:
+        print("Running EDOF functions remotely")
+        edof_images = ray.get(futures)
+        k = 0
+        for x in range(self.codex_object.metadata['nx'] + 1):
+            images_temp = None
+            if (x + 1) % 2 == 0:
+                y_range = range(self.codex_object.metadata['ny'], -1, -1)
+            else:
+                y_range = range(self.codex_object.metadata['ny'] + 1)
+
+            for y in y_range:
+                if self.codex_object.metadata['real_tiles'][x,y]=='x':
+                    continue
+                image = edof_images[k]
+                if images_temp is None: # Build column
                     images_temp = image
                 else:
                     images_temp = np.concatenate((images_temp, image), 1)
@@ -105,11 +115,12 @@ class ProcessCodex:
 
         return images
 
+
     def background_subtraction(self, image, background_1, background_2, cycle, channel):
         """ Apply background subtraction 
 
         Args:
-            image: Input images withe EDOF applied
+            image: Input images with EDOF applied
 
         Returns:
             image: Image with background subtracted
@@ -133,6 +144,18 @@ class ProcessCodex:
         image[not (image > 0 and background_1 > 0 and background_2 > 0)] = 0
         return image
 
+    # @ray.remote
+    # def _get_transform(self, image_ref, image, x, y, width):
+    #     image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
+    #     image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
+    #     print(image_subset.shape)
+    #     xoff, yoff, exoff, eyoff = chi2_shift(image_ref_subset, image_subset, return_error=True,
+    #                                           upsample_factor='auto')
+
+    #     initial_correlation = corr2(image_subset, image_ref_subset)
+    #     final_correlation = corr2(image_subset, image_ref_subset)
+    #     return xoff, yoff, initial_correlation, final_correlation
+
     def cycle_alignment_get_transform(self, image_ref, image):
         """ Get and stash a cycle alignment transformation
 
@@ -147,26 +170,35 @@ class ProcessCodex:
         shift_list = []
         initial_correlation_list = []
         final_correlation_list = []
-        print("Calculating cycle alignment")
+        futures = []
+        print("Making cycle alignment jobs")
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
-                image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
-                image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
-                print(image_subset.shape)
-                xoff, yoff, exoff, eyoff = chi2_shift(image_ref_subset, image_subset, return_error=True,
-                                                      upsample_factor='auto')
+                if self.codex_object.metadata['real_tiles'][x,y]=='x':
+                    continue
+                futures.append(get_transform.remote(image_ref, image, x, y, width))
+
+        print("Running cycle alignment jobs remotely")
+        alignment_info = ray.get(futures)
+        k = 0
+        for x in range(self.codex_object.metadata['nx']):
+            for y in range(self.codex_object.metadata['ny']):
+                if self.codex_object.metadata['real_tiles'][x,y]=='':
+                    continue
+                xoff, yoff, initial_correlation, final_correlation = alignment_info[k]
+
                 shift_list.append((xoff, yoff))
-                initial_correlation = corr2(image_subset, image_ref_subset)
                 initial_correlation_list.append(initial_correlation)
                 image_subset = shift.shift2d(image_subset, -xoff, -yoff)
-                final_correlation = corr2(image_subset, image_ref_subset)
                 final_correlation_list.append(final_correlation)
+                k+=1
 
         print("Shift list size is: " + str(len(shift_list)))
         print(shift_list)
         cycle_alignment_info = {"shift": shift_list, "initial_correlation": initial_correlation_list,
                                 "final_correlation": final_correlation_list}
-        return cycle_alignment_info, image
+        return cycle_alignment_info
+
 
     def cycle_alignment_apply_transform(self, image_ref, image, cycle_alignment_info):
         """ Get and stash a cycle alignment transformation
@@ -174,6 +206,8 @@ class ProcessCodex:
         Assert that self.codex_object.cycle_alginment{cl} exists
         If no transform is found, calculate it
         Apply the transform
+
+        This function modifies `image` 
 
         Args:
             image: Any channel image from any cycle after the first
@@ -188,6 +222,10 @@ class ProcessCodex:
         final_correlation_list = []
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
+
+                if self.codex_object.metadata['real_tiles'][x,y]=='x':
+                    continue
+
                 xoff, yoff = shift_list[x + 3 * y]
                 image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
@@ -198,34 +236,41 @@ class ProcessCodex:
                 final_correlation_list.append(final_correlation)
         return image
 
+
     def shading_correction(self, image, cycle, channel):
         image_list = []
         print("Shading correction started for cycle {} and channel {}".format(cycle, channel))
         width = self.codex_object.metadata['tileWidth']
-        for x in range(self.codex_object.metadata['nx'] + 1):
-            for y in range(self.codex_object.metadata['ny'] + 1):
+        for x in range(self.codex_object.metadata['nx']):
+            for y in range(self.codex_object.metadata['ny']):
+                if self.codex_object.metadata['real_tiles'][x,y]=='x':
+                    continue
                 image_subset = image[x * width : (x + 1) * width, y * width : (y + 1) * width]
                 image_list.append(image_subset)
+
         image_array = np.dstack(image_list)
         print("Image array has shape {}".format(image_array.shape))
         flatfield, darkfield = basic(images=image_array, segmentation=None)
         print("Flatfield has shape {} and darkfield has shape {}".format(flatfield.shape, darkfield.shape))
         np.save(file='flatfield.npy', arr=flatfield)
         np.save(file='darkfield.npy', arr=darkfield)
-        for x in range(self.codex_object.metadata['nx'] + 1):
-            for y in range(self.codex_object.metadata['ny'] + 1):
+
+        for x in range(self.codex_object.metadata['nx']):
+            for y in range(self.codex_object.metadata['ny']):
                 image_subset = image[x * width:(x + 1) * width, y * width: (y + 1) * width]
                 image[x * width: (x+1) * width, y * width : (y+1) * width] = ((image_subset.astype('double') - darkfield) / flatfield).astype('uint16')
 
         return image + 1
 
-    def stitch_images(self, image, image_width, overlap_width, j, mask, stitching_object, cycle, channel):
-        """ Stitch neighboring tiles in an orderly fashion
 
-        Args:
-            image: Any channel image
+@ray.remote
+def get_transform(image_ref, image, x, y, width):
+    image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
+    image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
+    print(image_subset.shape)
+    xoff, yoff, exoff, eyoff = chi2_shift(image_ref_subset, image_subset, return_error=True,
+                                            upsample_factor='auto')
 
-        Returns:
-            aligned_image:
-        """
-        pass
+    initial_correlation = corr2(image_subset, image_ref_subset)
+    final_correlation = corr2(image_subset, image_ref_subset)
+    return xoff, yoff, initial_correlation, final_correlation

@@ -10,6 +10,7 @@ import pandas as pd
 from pathlib import Path
 import numpy as np
 import pickle as pkl
+import ray
 import sys
 
 if __name__ == '__main__':
@@ -30,7 +31,12 @@ if __name__ == '__main__':
     cycle_folders = cycle_folders[1:]
 
     xml_file_path = list(base_path.glob('*.xml'))
-    xlif_file_path = cycle_folders[0] / 'Metadata' / 'TileScan 1.xlif'
+    if codex_object.region == 0:
+        xlif_file_path = cycle_folders[0] / 'Metadata' / 'TileScan 1.xlif'
+    else:
+        xlif_file_path = cycle_folders[0] / 'TileScan 1' / 'Metadata' / f'Region {codex_object.region}.xlif'
+        if not xlif_file_path.exists():
+            xlif_file_path = cycle_folders[0] / 'TileScan 1' / 'Metadata' / f'Position {codex_object.region}.xlif'
 
     print("XLIF file path is: " + str(xlif_file_path))
     print("XML file path is: " + str(xml_file_path))
@@ -60,21 +66,27 @@ if __name__ == '__main__':
     cycle_range = [0]
     print("Cycle range is: " + str(cycle_range))
 
+    print("Setting up Ray")
+    ray.init(num_cpus=8)
+
     for channel in range(1):
         for cycle, cycle_index in zip(cycle_range, range(codex_object.metadata['ncl'])):
             image = process_codex.apply_edof(cycle, channel)
             print("EDOF done. Saving file.")
             np.save(file='edof.npy', arr=image)
 
+            image_obj_id = ray.put(image)
             print("Shading correction reached")
 
             image = process_codex.shading_correction(image, cycle, channel)
             np.save(file='shading_correction.npy', arr=image)
 
             if channel == 0 and cycle == 0:
-                image_ref = image
+                image_ref_obj_id = ray.put(image)
+                # image_ref = image
             elif cycle > 0 and channel == 0:
-                cycle_alignment_info, image = process_codex.cycle_alignment_get_transform(image_ref, image)
+                image_obj_id = ray.put(image)
+                cycle_alignment_info = process_codex.cycle_alignment_get_transform(image_ref_obj_id, image_obj_id)
                 codex_object.cycle_alignment_info.append(cycle_alignment_info)
             else:
                 image = process_codex.cycle_alignment_apply_transform(image_ref, image,
@@ -105,23 +117,29 @@ if __name__ == '__main__':
                                                                 codex_object.metadata['tileWidth'],
                                                                 codex_object.metadata['width'])
                 k = 0
-                while not np.all(mask):
+                while np.sum(mask) < np.sum(codex_object.metadata['real_tiles']!='x'):
                     tile_1, tile_2, registration = stitching_object.find_tile_pairs(mask)
                     tile_2.x_off = registration.get('xoff') + tile_1.x_off
                     tile_2.y_off = registration.get('yoff') + tile_1.y_off
                     tile_1.stitching_index = k
                     k += 1
                     tile_2.stitching_index = k
-                    j, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], codex_object.metadata['width'], j, mask, tile_2,
+                    j, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], 
+                                                            codex_object.metadata['width'], j, mask, tile_2,
                                                             tile_2.x_off, tile_2.y_off)
             else:
                 tiles = stitching_object.tiles
                 tiles.sort(key=lambda t:t.stitching_index)
                 print('Tiles array is {0}'.format(tiles))
                 for tile in tiles:
-                    j, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], codex_object.metadata['width'], j, None, tile, tile.x_off, tile.y_off)
+                    j, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], 
+                                                            codex_object.metadata['width'], j, None, tile, 
+                                                            tile.x_off, tile.y_off)
 
             print("Stitching done")
             with open("stitch.pkl", "wb") as f:
                 pkl.dump(f, j)
             print("Stitching file saved")
+
+            # clear image data
+            del image_obj_id

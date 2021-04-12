@@ -1,7 +1,24 @@
 import cv2
 import numpy as np
 import scipy.ndimage as ndimage
+from utilities.utility import read_tile_at_z
+import ray
 
+@ray.remote
+def edof_loop(codex_object, cl, ch, x, y):
+
+    image_s = np.zeros((codex_object.metadata['tileWidth'], codex_object.metadata['tileWidth'],
+                        codex_object.metadata['nz']))
+
+    if codex_object.metadata['real_tiles'][x,y] != '':
+        for z in range(codex_object.metadata['nz']):
+            image = read_tile_at_z(codex_object, cl, ch, x, y, z)
+            if image is None:
+                raise Exception("Image at above path isn't present")
+            image_s[:, :, z] = image
+        image = calculate_focus_stack(image_s)
+
+    return image
 
 def calculate_focus_stack(image, processor='CPU'):
     """Turn this method into a class if more than one focus stack method is needed"""
