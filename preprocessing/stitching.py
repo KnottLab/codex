@@ -9,6 +9,12 @@ from utilities.utility import corr2
 import random
 
 
+def dumpimg(pth,img):
+  img = (255*(img/np.max(img.ravel()))).astype(np.uint8)
+  cv2.imwrite(pth, img) 
+
+
+
 class Stitching:
     """Stitching algorithm for microscopic images. It consists of the following steps:
 
@@ -23,7 +29,9 @@ class Stitching:
         :param codex_object: CODEX object
         """
         self.codex_object = codex_object
-        self._tiles = []
+        self.nx = self.codex_object.metadata['nx']
+        self.ny = self.codex_object.metadata['ny']
+        self._tiles = np.zeros((self.nx, self.ny), dtype='object')
 
     @property
     def tiles(self):
@@ -48,7 +56,7 @@ class Stitching:
           first_tile.y * (image_width - overlap_width): (first_tile.y + 1) * (image_width - overlap_width) + overlap_width] = image_subset + 1
 
         m[first_tile.x * (image_width - overlap_width): (first_tile.x + 1) * (image_width - overlap_width) + overlap_width,
-        first_tile.y * (image_width - overlap_width): (first_tile.y + 1) * (
+          first_tile.y * (image_width - overlap_width): (first_tile.y + 1) * (
                     image_width - overlap_width) + overlap_width] = np.ones(image_subset.shape)
 
         mask = np.zeros((self.codex_object.metadata['nx'], self.codex_object.metadata['ny']))
@@ -59,10 +67,10 @@ class Stitching:
     def find_first_tile(self):
         print("Finding the first tile")
         max_correlation = 0
-        first_tile = self._tiles[0]
-        for tile in self._tiles[1:len(self._tiles) - 1]:
+        first_tile = self._tiles.ravel()[0]
+        for tile in self._tiles.ravel()[1:len(self._tiles) - 1]:
             correlation_list = []
-            for registration in tile.registration_details:
+            for other_tile_id, registration in tile.registration_details.items():
                 correlation = registration.get('final_correlation')
                 correlation_list.append(correlation)
             avg_correlation = np.mean(correlation_list)
@@ -75,42 +83,47 @@ class Stitching:
     def stitch_tiles(self, image, image_width, overlap_width, j, m, mask, tile_2, x_off, y_off):
         x_2, y_2 = tile_2.x, tile_2.y
         image_subset = image[x_2*image_width : (x_2 + 1) * image_width, y_2 * image_width : (y_2 + 1) * image_width]
-        # this line is different from matlab, the matlab code uses imref2d to define co-ordinates
-        print("X_off and Y_off are {0} and {1}".format(x_off, y_off))
-        print("image width is {0} and overlap width is {1}".format(image_width, overlap_width))
-        transform_matrix = np.float32([[1, 0, -x_off], [0, 1, -y_off]])
-        rows, cols = image_subset.shape
-        rows -= np.ceil(y_off)
-        cols -= np.ceil(x_off)
-        warped_image = cv2.warpAffine(image_subset, transform_matrix, (cols, rows))
-        print("Shape of warped image is {0}".format(warped_image.shape))
-        x_start = x_2 * (image_width - overlap_width)
-        x_end = (x_2 + 1) * (image_width - overlap_width) + overlap_width - np.ceil(y_off)
-        y_start = y_2 * (image_width - overlap_width)
-        y_end = (y_2 + 1) * (image_width - overlap_width) + overlap_width - np.ceil(x_off)
+        print("x_off= {0:2.3f} y_off= {1:2.3f}".format(x_off, y_off))
+
+        x_start = x_2 * (image_width - overlap_width) + int(np.ceil(x_off))
+        x_end = min(x_start + image_width, j.shape[0])
+        y_start = y_2 * (image_width - overlap_width) + int(np.ceil(y_off))
+        y_end = min(y_start + image_width, j.shape[1])
+
+        x_start = max(0, x_start)
+        y_start = max(0, y_start)
+        dx = x_end - x_start
+        dy = y_end - y_start
+
         print("X_start and X_end are {0} and {1}".format(x_start, x_end))
         print("Y_start and Y_end are {0} and {1}".format(y_start, y_end))
-        if x_end > j.shape[0]:
-            print('In max dx')
-            j = np.concatenate((j, np.zeros((x_end - j.shape[0] + 1, j.shape[1]))))
-            m = np.concatenate((m, np.zeros((x_end - m.shape[0] + 1, m.shape[1]))))
-        if y_end > j.shape[1]:
-            print('In max dy')
-            j = np.concatenate((j, np.zeros((j.shape[0], y_end - j.shape[1] + 1))), 1)
-            m = np.concatenate((m, np.zeros((m.shape[0], y_end - m.shape[1] + 1))), 1)
-        
-        # color_code = random.randint(1, 100)
-        # j[x_start:x_start + 3, y_start:y_end] = color_code
-        # j[x_start:x_end, y_start:y_start + 3] = color_code
-        # j[x_end - 3:x_end, y_start:y_end] = color_code
-        # j[x_start:x_end, y_end - 3 : y_end] = color_code
 
-        j[x_start:x_end, y_start:y_end] += warped_image.astype('uint16') * (j[x_start:x_end, y_start:y_end] == 0).astype('uint16')
-        m[x_start:x_end, y_start:y_end] += (warped_image > 0).astype('uint8')
+        ## Debugging images -- keep this around and allow a user to turn it on with a --debug flag later
+        # j2 = j.copy()
+        # jmax = np.max(j2.ravel())
+        # j2[x_start:x_start+10, y_start:y_end] = jmax
+        # j2[x_start:x_end, y_start:y_start + 10] = jmax
+        # j2[x_end - 10:x_end, y_start:y_end] = jmax
+        # j2[x_start:x_end, y_end - 10 : y_end] = jmax
+
+        # dumpimg('/storage/tmp/stitching/s/1_j.png', j2)
+        # dumpimg('/storage/tmp/stitching/s/2_img.png', image_subset)
+        
+        # jtmp = np.zeros_like(j) 
+        # jtmp[x_start:x_end, y_start:y_end] = image_subset[:dx, :dy].astype('uint16')
+        # jstack = np.dstack([j, jtmp, np.zeros_like(j)])
+        # dumpimg('/storage/tmp/stitching/s/4_j.png', jstack[:,:,::-1])
+
+        # j[x_start:x_end, y_start:y_end] += warped_image.astype('uint16') * (j[x_start:x_end, y_start:y_end] == 0).astype('uint16')
+        # m[x_start:x_end, y_start:y_end] += (warped_image > 0).astype('uint8')
+
+        j[x_start:x_end, y_start:y_end] += image_subset[:dx,:dy].astype('uint16') * (j[x_start:x_end, y_start:y_end] == 0).astype('uint16')
+        m[x_start:x_end, y_start:y_end] = 1
         if mask is not None:
            mask[x_2, y_2] = 1
 
         return j, m, mask
+
 
     def find_tile_pairs(self, mask):
         tile_indices = np.argwhere(mask > 0)
@@ -120,36 +133,41 @@ class Stitching:
         for index in tile_indices:
             x, y = index
             print("Finding tile pairs for index {0} and {1}".format(x, y))
-            temp_tile_1 = self._tiles[y + x * self.codex_object.metadata['ny']]
+            # temp_tile_1 = self._tiles[y + x * self.codex_object.metadata['ny']]
+            temp_tile_1 = self._tiles[x,y]
             neighbor_indices = temp_tile_1.neighbors
-            registration_details = temp_tile_1.registration_details
+            # registration_details = temp_tile_1.registration_details
             for i, neighbor in enumerate(neighbor_indices):
                 x_n, y_n = neighbor
-                temp_tile_2 = self._tiles[y_n + x_n * self.codex_object.metadata['ny']]
-                registration = registration_details[i]
+                #temp_tile_2 = self._tiles[y_n + x_n * self.codex_object.metadata['ny']]
+                temp_tile_2 = self._tiles[x_n, y_n]
+                registration = temp_tile_2.registration_details[(x,y)]
                 correlation = registration.get('final_correlation')
                 if correlation > max_correlation and mask[x, y] == 1 and mask[x_n, y_n] == 0:
                     max_correlation = correlation
                     tile_1 = temp_tile_1
                     tile_2 = temp_tile_2
+
+        registration = tile_2.registration_details[(tile_1.x,tile_1.y)]
         return tile_1, tile_2, registration
+
 
     def init_stitching(self, image, image_width, overlap_width):
         # Step 1: calculate neighbors for each tile
-        self._tiles = self.calculate_neighbors()
-        for tile in self._tiles:
-            registration_transform_list = list()
+        self.calculate_neighbors()
+        for tile in self._tiles.ravel():
+            registration_transform_dict = {}
             for neighbor in tile.neighbors:
                 initial_corr, final_corr, xoff, yoff = self.get_registration_transform(tile.x, tile.y, neighbor[0],
                                                                                        neighbor[1], image, image_width,
                                                                                        overlap_width)
                 registration_transform = {"initial_correlation": initial_corr, "final_correlation": final_corr,
                                           "xoff": xoff, "yoff": yoff}
-                registration_transform_list.append(registration_transform)
+                registration_transform_dict[(neighbor[0], neighbor[1])] = registration_transform
 
-            tile.registration_details = registration_transform_list
+            tile.registration_details = registration_transform_dict
 
-        return self._tiles
+
 
     def get_registration_transform(self, x1, y1, x2, y2, image, image_width, overlap_width):
         """Get transform that maximizes correlation between overlaping regions."""
@@ -158,50 +176,48 @@ class Stitching:
         overlap_tile_1 = tile_1
         overlap_tile_2 = tile_2
 
-        print(tile_1.shape, tile_2.shape)
+        print(f'tile1 ({x1},{y1}) ---vs--- tile2 ({x2},{y2})')
 
         # Get overlaps
-        if x2 > x1:
+        if x2 > x1: # tile1 below tile2
             overlap_tile_1 = tile_1[image_width - overlap_width:, :]
             overlap_tile_2 = tile_2[:overlap_width, :]
-        elif x2 < x1:
+        elif x2 < x1: # tile1 above tile2
             overlap_tile_1 = tile_1[:overlap_width, :]
             overlap_tile_2 = tile_2[image_width - overlap_width:, :]
-        elif y2 > y1:
+        elif y2 > y1: # tile1 left of tile2
             overlap_tile_1 = tile_1[:, image_width - overlap_width:]
             overlap_tile_2 = tile_2[:, :overlap_width]
-        elif y2 < y1:
+        elif y2 < y1: # tile1 right of tile2
             overlap_tile_1 = tile_1[:, :overlap_width]
             overlap_tile_2 = tile_2[:, image_width - overlap_width:]
 
-        print(overlap_tile_1.shape, overlap_tile_2.shape)
         initial_correlation = corr2(overlap_tile_1, overlap_tile_2)
         xoff, yoff, xeoff, yeoff = chi2_shift(overlap_tile_1, overlap_tile_2, return_error=True, upsample_factor='auto')
         shifted_image = shift.shift2d(overlap_tile_2, -xoff, -yoff)
-
-        print("Before shifting the correlation is {0}".format(initial_correlation))
+        print("\tBefore shifting the correlation is {0}".format(initial_correlation))
 
         warped_correlation = corr2(overlap_tile_1[shifted_image > 0], shifted_image[shifted_image > 0])
-        print("Warped correlation is {0}".format(warped_correlation))
+        print("\tWarped correlation is {0}".format(warped_correlation))
+        print(f'\tRaw xoff={xoff}, yoff={yoff}')
+
+        # For some reason when tiles are stacked vertically, xoff and yoff need to swap
+        if x2 > x1:   # tile1 below tile2
+            xoff, yoff = yoff, xoff
+        elif x2 < x1: # tile1 above tile2
+            xoff, yoff = yoff, xoff
         
-        print("Saving overlapping regions")
-        cv2.imwrite('overlap_tile_1_{0}_{1}_{2}_{3}.tif'.format(x1, y1, x2, y2), overlap_tile_1)
-        cv2.imwrite('warped_tile_2_{0}_{1}_{2}_{3}.tif'.format(x1, y1, x2, y2), shifted_image)
         return initial_correlation, warped_correlation, xoff, yoff
+
 
     def calculate_neighbors(self):
         """Calculate neighbors using the imdilate function.
          :arg image: Image to calculate neighbors from
         """
-        range_x = self.codex_object.metadata['nx']
-        range_y = self.codex_object.metadata['ny']
-        tiles = []
-        for x in range(range_x):
-            for y in range(range_y):
-                if self.codex_object.metadata['real_tiles'][x,y] == 'x':
-                    continue
 
-                neighbor_image = np.zeros((range_x, range_y))
+        for x in range(self.nx):
+            for y in range(self.ny):
+                neighbor_image = np.zeros((self.nx, self.ny))
                 neighbor_image[x, y] = 1
                 print("Neighbor image is: " + str(neighbor_image))
                 kernel = octagon(1, 1)
@@ -212,7 +228,4 @@ class Stitching:
                 print("Neighbor indices are: " + str(neighbor_indices))
                 tile = Tile(x, y)
                 tile.neighbors = neighbor_indices
-                tiles.append(tile)
-
-        print("Total number of tiles are {0}".format(len(tiles)))
-        return tiles
+                self.tiles[x,y] = tile

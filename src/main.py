@@ -107,8 +107,8 @@ if __name__ == '__main__':
 
             print("Stitching started")
             if channel == 0 and cycle == 0:
-                tiles = stitching_object.init_stitching(image, image_width=codex_object.metadata['tileWidth'],
-                                                        overlap_width=codex_object.metadata['width'])
+                stitching_object.init_stitching(image, image_width=codex_object.metadata['tileWidth'],
+                                                overlap_width=codex_object.metadata['width'])
                 with open("tiles.pkl", "wb") as f:
                     pkl.dump(tiles, f)
                 first_tile = stitching_object.find_first_tile()
@@ -119,19 +119,16 @@ if __name__ == '__main__':
                 k = 1
                 while not np.all(mask):
                     tile_1, tile_2, registration = stitching_object.find_tile_pairs(mask)
+                    print(tile_1)
                     tile_2.x_off = registration.get('xoff') + tile_1.x_off
                     tile_2.y_off = registration.get('yoff') + tile_1.y_off
                     tile_2.stitching_index = k
-                    j, m, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], codex_object.metadata['width'], j, m, mask, tile_2,
-                                                            tile_2.x_off, tile_2.y_off)
-                    temp = j.copy()
-                    div = np.quantile(temp, 0.9999)
-                    temp[temp > div] = div
-                    temp /= div
-                    temp *= 255
-                    temp = temp.astype('uint8')
-                    cv2.imwrite('../debug/stitching/stitch_{0}.tif'.format(k), temp)
+                    print(tile_2)
+                    j, m, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], 
+                                                               codex_object.metadata['width'], j, m, mask, tile_2,
+                                                               tile_2.x_off, tile_2.y_off)
                     k += 1
+
                 # Correct corners
                 dilated_m = cv2.dilate(m, octagon(1, 1), iterations=1)
                 m = ((dilated_m - m) > 0).astype('uint8')
@@ -149,4 +146,5 @@ if __name__ == '__main__':
                 tiles.sort(key=lambda t:t.stitching_index)
                 for tile in tiles:
                     print("Stitching index of tile is {0}".format(tile.stitching_index))
-                    j, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], codex_object.metadata['width'], j, None, tile, tile.x_off, tile.y_off)
+                    j, m, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], codex_object.metadata['width'], j, 
+                                                               None, tile, tile.x_off, tile.y_off)
