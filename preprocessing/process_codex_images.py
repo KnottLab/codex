@@ -79,22 +79,22 @@ class ProcessCodex:
                 y_range = range(self.codex_object.metadata['ny'])
 
             for y in y_range:
-                if self.codex_object.metadata['real_tiles'][x,y] == 'x':
-                    continue
+                #if self.codex_object.metadata['real_tiles'][x,y] == 'x':
+                #    continue
 
                 print("Processing : " + self.codex_object.metadata['marker_names_array'][cl][ch] + " CL: " + str(
                     cl) + " CH: " + str(ch) + " X: " + str(x) + " Y: " + str(y))
                 image_s = np.zeros((self.codex_object.metadata['tileWidth'], self.codex_object.metadata['tileWidth'],
                                     self.codex_object.metadata['nz']))
 
-                if self.codex_object.metadata['real_tiles'][x,y] != 'x':
-                    for z in range(self.codex_object.metadata['nz']):
-                        image = read_tile_at_z(self.codex_object, cl, ch, x, y, z)
-                        if image is None:
-                            raise Exception("Image at above path isn't present")
-                        image_s[:, :, z] = image
+                #if self.codex_object.metadata['real_tiles'][x,y] != 'x':
+                for z in range(self.codex_object.metadata['nz']):
+                    image = read_tile_at_z(self.codex_object, cl, ch, x, y, z)
+                    if image is None:
+                        raise Exception("Image at above path isn't present")
+                    image_s[:, :, z] = image
 
-                    image = calculate_focus_stack(image_s)
+                image = calculate_focus_stack(image_s)
 
                 if images_temp is None:
                     images_temp = image
@@ -156,8 +156,8 @@ class ProcessCodex:
         print("Calculating cycle alignment")
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
-                if self.codex_object.metadata['real_tiles'][x,y] == 'x':
-                    continue
+                #if self.codex_object.metadata['real_tiles'][x,y] == 'x':
+                #    continue
                 image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 print(image_subset.shape)
