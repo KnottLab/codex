@@ -33,8 +33,9 @@ class XMLDecoder:
             # This is weird as it's flipped
             x = max(int(tile.get('FieldY')), x)
             y = max(int(tile.get('FieldX')), y)
-
-        return x, y
+        
+        print('Value of X is {0} and Y is {1}'.format(x, y))
+        return x + 1, y + 1
 
     def _number_of_z_stacks(self, root):
         z_stacks = int(root.find('ZstackDepth').text)

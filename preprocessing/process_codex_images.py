@@ -71,12 +71,12 @@ class ProcessCodex:
         """
         k = 1
         images = None
-        for x in range(self.codex_object.metadata['nx'] + 1):
+        for x in range(self.codex_object.metadata['nx']):
             images_temp = None
             if (x + 1) % 2 == 0:
-                y_range = range(self.codex_object.metadata['ny'], -1, -1)
+                y_range = range(self.codex_object.metadata['ny'] - 1, -1, -1)
             else:
-                y_range = range(self.codex_object.metadata['ny'] + 1)
+                y_range = range(self.codex_object.metadata['ny'])
 
             for y in y_range:
                 print("Processing : " + self.codex_object.metadata['marker_names_array'][cl][ch] + " CL: " + str(
@@ -188,7 +188,7 @@ class ProcessCodex:
         final_correlation_list = []
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
-                xoff, yoff = shift_list[x + 3 * y]
+                xoff, yoff = shift_list[x + 4 * y]
                 image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 initial_correlation = corr2(image_ref_subset, image_subset)
@@ -202,8 +202,8 @@ class ProcessCodex:
         image_list = []
         print("Shading correction started for cycle {} and channel {}".format(cycle, channel))
         width = self.codex_object.metadata['tileWidth']
-        for x in range(self.codex_object.metadata['nx'] + 1):
-            for y in range(self.codex_object.metadata['ny'] + 1):
+        for x in range(self.codex_object.metadata['nx']):
+            for y in range(self.codex_object.metadata['ny']):
                 image_subset = image[x * width : (x + 1) * width, y * width : (y + 1) * width]
                 image_list.append(image_subset)
         image_array = np.dstack(image_list)
@@ -212,8 +212,8 @@ class ProcessCodex:
         print("Flatfield has shape {} and darkfield has shape {}".format(flatfield.shape, darkfield.shape))
         np.save(file='flatfield.npy', arr=flatfield)
         np.save(file='darkfield.npy', arr=darkfield)
-        for x in range(self.codex_object.metadata['nx'] + 1):
-            for y in range(self.codex_object.metadata['ny'] + 1):
+        for x in range(self.codex_object.metadata['nx']):
+            for y in range(self.codex_object.metadata['ny']):
                 image_subset = image[x * width:(x + 1) * width, y * width: (y + 1) * width]
                 image[x * width: (x+1) * width, y * width : (y+1) * width] = ((image_subset.astype('double') - darkfield) / flatfield).astype('uint16')
 

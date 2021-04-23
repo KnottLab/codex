@@ -33,7 +33,7 @@ def num2str(x, version='1'):
 def read_tile_at_z(codex_obj, cl, ch, x, y, z):
     if codex_obj.metadata['cycle_folders']:
         path = str(codex_obj.metadata['cycle_folders'][
-            cl]) + '/TileScan 1--Stage' + num2str(x * (codex_obj.metadata['ny'] + 1) + y,
+            cl]) + '/TileScan 1--Stage' + num2str(x * codex_obj.metadata['ny'] + y,
                                                  version='2') + '--Z' + num2str(z, version='2') + '--C' + num2str(
             ch, version='2') + '.tif'
 
