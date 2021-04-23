@@ -11,6 +11,9 @@ from pathlib import Path
 import numpy as np
 import pickle as pkl
 import sys
+import cv2
+from skimage.morphology import octagon
+import scipy.ndimage as ndimage
 
 if __name__ == '__main__':
 
@@ -67,14 +70,17 @@ if __name__ == '__main__':
 
     for channel in range(1):
         for cycle, cycle_index in zip(cycle_range, range(codex_object.metadata['ncl'])):
-            image = process_codex.apply_edof(cycle, channel)
-            print("EDOF done. Saving file.")
-            np.save(file='edof.npy', arr=image)
+            # image = process_codex.apply_edof(cycle, channel)
+            # print("EDOF done. Saving file.")
+            image = np.load('edof.npy')
+            # np.save(file='edof.npy', arr=image)
 
             print("Shading correction reached")
 
-            image = process_codex.shading_correction(image, cycle, channel)
-            np.save(file='shading_correction.npy', arr=image)
+            # image = process_codex.shading_correction(image, cycle, channel)
+            # np.save(file='shading_correction.npy', arr=image)
+            image = np.load('shading_correction.npy')
+            print("Image shape is {0}".format(image.shape))
 
             if channel == 0 and cycle == 0:
                 image_ref = image
@@ -109,25 +115,38 @@ if __name__ == '__main__':
                 j, m, mask = stitching_object.stitch_first_tile(first_tile, image,
                                                                 codex_object.metadata['tileWidth'],
                                                                 codex_object.metadata['width'])
-                k = 0
-                # while not np.all(mask):
-                while np.sum(mask) < np.sum(codex_object.metadata['real_tiles']!='x'):
+                first_tile.stitching_index = 0
+                k = 1
+                while not np.all(mask):
                     tile_1, tile_2, registration = stitching_object.find_tile_pairs(mask)
                     tile_2.x_off = registration.get('xoff') + tile_1.x_off
                     tile_2.y_off = registration.get('yoff') + tile_1.y_off
-                    tile_1.stitching_index = k
-                    k += 1
                     tile_2.stitching_index = k
-                    j, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], codex_object.metadata['width'], j, mask, tile_2,
+                    j, m, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], codex_object.metadata['width'], j, m, mask, tile_2,
                                                             tile_2.x_off, tile_2.y_off)
+                    temp = j.copy()
+                    div = np.quantile(temp, 0.9999)
+                    temp[temp > div] = div
+                    temp /= div
+                    temp *= 255
+                    temp = temp.astype('uint8')
+                    cv2.imwrite('../debug/stitching/stitch_{0}.tif'.format(k), temp)
+                    k += 1
+                # Correct corners
+                dilated_m = cv2.dilate(m, octagon(1, 1), iterations=1)
+                m = ((dilated_m - m) > 0).astype('uint8')
+                m = cv2.dilate(m, octagon(1, 2), iterations=1)
+                jf = ndimage.uniform_filter(j, size=5, mode='constant')
+                j[m > 0] = jf[m > 0]
+                div = np.quantile(j, 0.9999)
+                j[j > div] = div
+                j /= div
+                j *= 255
+                j = j.astype('uint8')
+                cv2.imwrite('../debug/stitching/stitch_final.tif', j)
             else:
                 tiles = stitching_object.tiles
                 tiles.sort(key=lambda t:t.stitching_index)
-                print('Tiles array is {0}'.format(tiles))
                 for tile in tiles:
+                    print("Stitching index of tile is {0}".format(tile.stitching_index))
                     j, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], codex_object.metadata['width'], j, None, tile, tile.x_off, tile.y_off)
-
-            print("Stitching done")
-            with open("stitch.pkl", "wb") as f:
-                pkl.dump(f, j)
-            print("Stitching file saved")

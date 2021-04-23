@@ -36,33 +36,9 @@ class XMLDecoder:
             # This is weird as it's flipped
             x = max(int(tile.get('FieldY')), x)
             y = max(int(tile.get('FieldX')), y)
-
-            # flip X and Y here too??
-            px.append(tile.get('PosX'))
-            py.append(tile.get('PosY'))
-
-        positions = [(i,j) for i,j in zip(px,py)]
-        Upx = np.unique(px)
-        Upy = np.unique(py)
-
-        x = len(Upx)
-        y = len(Upy)
-
-        real_tiles = np.zeros((x,y), dtype=object)
-        real_tiles[:] = 'x'
-        # snakes like this:
-        # 01 02 03 04
-        # 08 07 06 05
-        # 09 10 11 12
-        tile_num = 0 # start tile numbering at 0
-        for j in range(y):
-            Rx = np.arange(x) if j%2==0 else np.arange(x)[::-1]
-            for i in Rx:
-                if (Upx[i], Upy[j]) in positions:
-                    real_tiles[i,j] = f'{tile_num:03d}'
-
-        Ntiles = len(positions)
-        return x, y, real_tiles, Ntiles
+        
+        print('Value of X is {0} and Y is {1}'.format(x, y))
+        return x + 1, y + 1
 
     def _number_of_z_stacks(self, root):
         z_stacks = int(root.find('ZstackDepth').text)

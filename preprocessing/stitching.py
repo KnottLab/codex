@@ -6,6 +6,7 @@ from model.tile import Tile
 from image_registration import chi2_shift
 from image_registration.fft_tools import shift
 from utilities.utility import corr2
+import random
 
 
 class Stitching:
@@ -44,8 +45,7 @@ class Stitching:
         m = np.zeros((self.codex_object.metadata['nx'] * (image_width - overlap_width) + overlap_width,
                      self.codex_object.metadata['ny'] * (image_width - overlap_width) + overlap_width))
         j[first_tile.x * (image_width - overlap_width):(first_tile.x + 1) * (image_width - overlap_width) + overlap_width,
-        first_tile.y * (image_width - overlap_width): (first_tile.y + 1) * (
-                    image_width - overlap_width) + overlap_width] = image_subset
+          first_tile.y * (image_width - overlap_width): (first_tile.y + 1) * (image_width - overlap_width) + overlap_width] = image_subset + 1
 
         m[first_tile.x * (image_width - overlap_width): (first_tile.x + 1) * (image_width - overlap_width) + overlap_width,
         first_tile.y * (image_width - overlap_width): (first_tile.y + 1) * (
@@ -72,25 +72,45 @@ class Stitching:
 
         return first_tile
 
-    def stitch_tiles(self, image, image_width, overlap_width, j, mask, tile_2, x_off, y_off):
+    def stitch_tiles(self, image, image_width, overlap_width, j, m, mask, tile_2, x_off, y_off):
         x_2, y_2 = tile_2.x, tile_2.y
         image_subset = image[x_2*image_width : (x_2 + 1) * image_width, y_2 * image_width : (y_2 + 1) * image_width]
         # this line is different from matlab, the matlab code uses imref2d to define co-ordinates
-        warped_image = shift.shift2d(image_subset, -x_off, -y_off)
-        dx = list(range(x_2 * (image_width - overlap_width), (x_2 + 1) * (image_width - overlap_width) + overlap_width))
-        dx = [x + x_off for x in dx]
-        dy = list(range(y_2 * (image_width - overlap_width), (y_2 + 1) * (image_width - overlap_width) + overlap_width))
-        dy = [y + y_off for y in dy]
-        if max(dx) > j.shape[0]:
-            j = np.concatenate((j, np.zeros((max(dx) - j.shape[0], j.shape[1]))))
-        if max(dy) > j.shape[1]:
-            j = np.concatenate((j, np.zeros((j.shape[0], max(dy) - j.shape[1]))), 1)
+        print("X_off and Y_off are {0} and {1}".format(x_off, y_off))
+        print("image width is {0} and overlap width is {1}".format(image_width, overlap_width))
+        transform_matrix = np.float32([[1, 0, -x_off], [0, 1, -y_off]])
+        rows, cols = image_subset.shape
+        rows -= np.ceil(y_off)
+        cols -= np.ceil(x_off)
+        warped_image = cv2.warpAffine(image_subset, transform_matrix, (cols, rows))
+        print("Shape of warped image is {0}".format(warped_image.shape))
+        x_start = x_2 * (image_width - overlap_width)
+        x_end = (x_2 + 1) * (image_width - overlap_width) + overlap_width - np.ceil(y_off)
+        y_start = y_2 * (image_width - overlap_width)
+        y_end = (y_2 + 1) * (image_width - overlap_width) + overlap_width - np.ceil(x_off)
+        print("X_start and X_end are {0} and {1}".format(x_start, x_end))
+        print("Y_start and Y_end are {0} and {1}".format(y_start, y_end))
+        if x_end > j.shape[0]:
+            print('In max dx')
+            j = np.concatenate((j, np.zeros((x_end - j.shape[0] + 1, j.shape[1]))))
+            m = np.concatenate((m, np.zeros((x_end - m.shape[0] + 1, m.shape[1]))))
+        if y_end > j.shape[1]:
+            print('In max dy')
+            j = np.concatenate((j, np.zeros((j.shape[0], y_end - j.shape[1] + 1))), 1)
+            m = np.concatenate((m, np.zeros((m.shape[0], y_end - m.shape[1] + 1))), 1)
+        
+        # color_code = random.randint(1, 100)
+        # j[x_start:x_start + 3, y_start:y_end] = color_code
+        # j[x_start:x_end, y_start:y_start + 3] = color_code
+        # j[x_end - 3:x_end, y_start:y_end] = color_code
+        # j[x_start:x_end, y_end - 3 : y_end] = color_code
 
-        j[dx, dy] = j[dx, dy] + warped_image.astype('uint16') * (j[dx, dy] == 0).astype('uint16')
-        if mask:
-            mask[x_2, y_2] = 1
+        j[x_start:x_end, y_start:y_end] += warped_image.astype('uint16') * (j[x_start:x_end, y_start:y_end] == 0).astype('uint16')
+        m[x_start:x_end, y_start:y_end] += (warped_image > 0).astype('uint8')
+        if mask is not None:
+           mask[x_2, y_2] = 1
 
-        return j, mask
+        return j, m, mask
 
     def find_tile_pairs(self, mask):
         tile_indices = np.argwhere(mask > 0)
@@ -99,12 +119,13 @@ class Stitching:
         tile_1, tile_2 = None, None
         for index in tile_indices:
             x, y = index
-            temp_tile_1 = self._tiles[x + y * self.codex_object.metadata['ny']]
+            print("Finding tile pairs for index {0} and {1}".format(x, y))
+            temp_tile_1 = self._tiles[y + x * self.codex_object.metadata['ny']]
             neighbor_indices = temp_tile_1.neighbors
             registration_details = temp_tile_1.registration_details
             for i, neighbor in enumerate(neighbor_indices):
                 x_n, y_n = neighbor
-                temp_tile_2 = self._tiles[x_n + y_n * self.codex_object.metadata['ny']]
+                temp_tile_2 = self._tiles[y_n + x_n * self.codex_object.metadata['ny']]
                 registration = registration_details[i]
                 correlation = registration.get('final_correlation')
                 if correlation > max_correlation and mask[x, y] == 1 and mask[x_n, y_n] == 0:
@@ -162,7 +183,10 @@ class Stitching:
 
         warped_correlation = corr2(overlap_tile_1[shifted_image > 0], shifted_image[shifted_image > 0])
         print("Warped correlation is {0}".format(warped_correlation))
-
+        
+        print("Saving overlapping regions")
+        cv2.imwrite('overlap_tile_1_{0}_{1}_{2}_{3}.tif'.format(x1, y1, x2, y2), overlap_tile_1)
+        cv2.imwrite('warped_tile_2_{0}_{1}_{2}_{3}.tif'.format(x1, y1, x2, y2), shifted_image)
         return initial_correlation, warped_correlation, xoff, yoff
 
     def calculate_neighbors(self):
@@ -190,4 +214,5 @@ class Stitching:
                 tile.neighbors = neighbor_indices
                 tiles.append(tile)
 
+        print("Total number of tiles are {0}".format(len(tiles)))
         return tiles
