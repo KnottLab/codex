@@ -124,8 +124,8 @@ class XMLDecoder:
         tile_info = self._number_of_xy_tiles(root_xlif)
         self.decoded_content['nx'] = tile_info[0]
         self.decoded_content['ny'] = tile_info[1]
-        self.decoded_content['real_tiles'] = tile_info[2]
-        self.decoded_content['Ntiles'] = tile_info[3]
+        # self.decoded_content['real_tiles'] = tile_info[2]
+        # self.decoded_content['Ntiles'] = tile_info[3]
         # self.decoded_content['RNx'] = # for dealing with non-rectangular ROIs
         # self.decoded_content['RNy'] = # for dealing with non-rectangular ROIs
         # self.decoded_content['real_tiles'] = # for dealing with non-rectangular ROIs
