@@ -5,7 +5,6 @@ import numpy as np
 import math
 
 
-# TODO (@nathanin) revamp this to deal with parsing an XML from a slide scanned with multiple ROIs
 class XMLDecoder:
 
     def __init__(self):
@@ -25,8 +24,12 @@ class XMLDecoder:
         number = len(channels.findall('string'))
         return number
 
+    # https://github.com/KnottLab/codex/blob/2ff63079a3964dea6e242a20defec5851630042e/functions/data_utils/create_CODEX_object.m#L215
     def _number_of_xy_tiles(self, root):
         attachment = root.find('Element').find('Data').find('Image').find('Attachment')
+        px = []
+        py = []
+
         x = 0
         y = 0
         for tile in attachment.findall('Tile'):
@@ -118,7 +121,11 @@ class XMLDecoder:
         self.decoded_content['cycle_folders'] = cycle_folders
         self.decoded_content['nch'] = self._number_of_channels(root_xml)
         self.decoded_content['nz'] = self._number_of_z_stacks(root_xml)
-        self.decoded_content['nx'], self.decoded_content['ny'] = self._number_of_xy_tiles(root_xlif)
+        tile_info = self._number_of_xy_tiles(root_xlif)
+        self.decoded_content['nx'] = tile_info[0]
+        self.decoded_content['ny'] = tile_info[1]
+        # self.decoded_content['real_tiles'] = tile_info[2]
+        # self.decoded_content['Ntiles'] = tile_info[3]
         # self.decoded_content['RNx'] = # for dealing with non-rectangular ROIs
         # self.decoded_content['RNy'] = # for dealing with non-rectangular ROIs
         # self.decoded_content['real_tiles'] = # for dealing with non-rectangular ROIs
