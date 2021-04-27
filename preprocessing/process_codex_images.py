@@ -79,8 +79,8 @@ class ProcessCodex:
                 y_range = range(self.codex_object.metadata['ny'])
 
             for y in y_range:
-                #if self.codex_object.metadata['real_tiles'][x,y] == 'x':
-                #    continue
+                if self.codex_object.metadata['real_tiles'][x,y] == 'x':
+                    continue
 
                 print("Processing : " + self.codex_object.metadata['marker_names_array'][cl][ch] + " CL: " + str(
                     cl) + " CH: " + str(ch) + " X: " + str(x) + " Y: " + str(y))
@@ -156,8 +156,8 @@ class ProcessCodex:
         print("Calculating cycle alignment")
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
-                #if self.codex_object.metadata['real_tiles'][x,y] == 'x':
-                #    continue
+                if self.codex_object.metadata['real_tiles'][x,y] == 'x':
+                    continue
                 image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 print(image_subset.shape)
@@ -196,7 +196,9 @@ class ProcessCodex:
         final_correlation_list = []
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
-                xoff, yoff = shift_list[x + 4 * y]
+                if self.codex_object.metadata['real_tiles'][x,y]=='x':
+                    continue
+                xoff, yoff = shift_list[x + 3 * y]
                 image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 initial_correlation = corr2(image_ref_subset, image_subset)
@@ -212,6 +214,8 @@ class ProcessCodex:
         width = self.codex_object.metadata['tileWidth']
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
+                if self.codex_object.metadata['real_tiles'][x,y]=='x':
+                    continue
                 image_subset = image[x * width : (x + 1) * width, y * width : (y + 1) * width]
                 image_list.append(image_subset)
         image_array = np.dstack(image_list)

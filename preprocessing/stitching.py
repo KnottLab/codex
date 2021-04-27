@@ -128,7 +128,6 @@ class Stitching:
     def find_tile_pairs(self, mask):
         tile_indices = np.argwhere(mask > 0)
         max_correlation = 0
-        registration = None
         tile_1, tile_2 = None, None
         for index in tile_indices:
             x, y = index
@@ -217,6 +216,9 @@ class Stitching:
 
         for x in range(self.nx):
             for y in range(self.ny):
+                if self.codex_object.metadata['real_tiles'][x, y] == 'x':
+                    continue
+
                 neighbor_image = np.zeros((self.nx, self.ny))
                 neighbor_image[x, y] = 1
                 print("Neighbor image is: " + str(neighbor_image))
