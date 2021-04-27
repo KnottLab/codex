@@ -37,7 +37,7 @@ class Codex:
     def __init__(self, dataset, index):
         self.sample_id = dataset.at[index, 'sampleID']
         self.data_path = dataset.at[index, 'data_path']
-        self.region = str(dataset.at[index, 'region']) # for processing slides with multiple ROI's
+        self.region = dataset.at[index, 'region'] # for processing slides with multiple ROI's
         self.fixation = dataset.at[index, 'fixation']
         self.organ = dataset.at[index, 'organ']
         self.species = dataset.at[index, 'species']

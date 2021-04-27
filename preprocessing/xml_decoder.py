@@ -30,16 +30,10 @@ class XMLDecoder:
         px = []
         py = []
 
-        x = 0
-        y = 0
         for tile in attachment.findall('Tile'):
-            # This is weird as it's flipped
-            x = max(int(tile.get('FieldY')), x)
-            y = max(int(tile.get('FieldX')), y)
-
             # flip X and Y here too??
-            px.append(tile.get('PosX'))
-            py.append(tile.get('PosY'))
+            px.append(tile.get('PosY'))
+            py.append(tile.get('PosX'))
 
         positions = [(i,j) for i,j in zip(px,py)]
         Upx = np.unique(px)
@@ -62,7 +56,7 @@ class XMLDecoder:
                     real_tiles[i,j] = f'{tile_num:03d}'
 
         Ntiles = len(positions)
-        return x + 1, y + 1, real_tiles, Ntiles
+        return x, y, real_tiles, Ntiles
 
     def _number_of_z_stacks(self, root):
         z_stacks = int(root.find('ZstackDepth').text)

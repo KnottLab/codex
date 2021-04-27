@@ -109,8 +109,6 @@ if __name__ == '__main__':
             if channel == 0 and cycle == 0:
                 stitching_object.init_stitching(image, image_width=codex_object.metadata['tileWidth'],
                                                 overlap_width=codex_object.metadata['width'])
-                with open("tiles.pkl", "wb") as f:
-                    pkl.dump(tiles, f)
                 first_tile = stitching_object.find_first_tile()
                 j, m, mask = stitching_object.stitch_first_tile(first_tile, image,
                                                                 codex_object.metadata['tileWidth'],
