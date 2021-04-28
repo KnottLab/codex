@@ -34,16 +34,16 @@ class Codex:
 
     """
 
-    def __init__(self, dataset, index):
-        self.sample_id = dataset.at[index, 'sampleID']
-        self.data_path = dataset.at[index, 'data_path']
-        self.region = dataset.at[index, 'region'] # for processing slides with multiple ROI's
-        self.fixation = dataset.at[index, 'fixation']
-        self.organ = dataset.at[index, 'organ']
-        self.species = dataset.at[index, 'species']
-        self.lab = dataset.at[index, 'lab']
-        self.processed = False # this should be a flag we set only after processing is done
-        self.processor = dataset.at[index, 'processor']
+    def __init__(self, data_path, sample_id, region):
+        self.sample_id = sample_id
+        self.data_path = data_path
+        self.region = region # for processing slides with multiple ROI's
+        # self.fixation = dataset.at[index, 'fixation']
+        # self.organ = dataset.at[index, 'organ']
+        # self.species = dataset.at[index, 'species']
+        # self.lab = dataset.at[index, 'lab']
+        # self.processed = False # this should be a flag we set only after processing is done
+        # self.processor = dataset.at[index, 'processor']
         self._metadata = None
         self._cycle_alignment_info = None
         self._background_1 = None

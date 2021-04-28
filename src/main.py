@@ -14,16 +14,20 @@ import sys
 import cv2
 from skimage.morphology import octagon
 import scipy.ndimage as ndimage
+import argparse
 
 if __name__ == '__main__':
 
-    dataset_metadata = pd.read_csv(filepath_or_buffer='../utilities/CODEX_dataset_metadata.csv')
+    parser = argparse.ArgumentParser(description='Codex pipeline arguments')
+   
+    parser.add_argument('--data_path', metavar='Data path', type=str, required=True, help='Data path to read CODEX raw data from')
+    parser.add_argument('--sample_id', metavar='Sample ID', type=str, required=True, help='Sample ID for the codex data')
+    parser.add_argument('--output_path', metavar='Output path', type=str, required=True, help='Output path for results')
+    parser.add_argument('--region', type=int, required=True, help='Region number from the multiple regions to scan from')
+    args = parser.parse_args()
 
-    print(dataset_metadata)
+    codex_object = codex.Codex(data_path=args.data_path, region=args.region, sample_id=args.sample_id)
 
-    codex_object = codex.Codex(dataset=dataset_metadata, index=31)
-
-    print(codex_object)
 
     base_path = Path(codex_object.data_path + "/" + codex_object.sample_id)
 
