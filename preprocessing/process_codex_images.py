@@ -72,12 +72,12 @@ class ProcessCodex:
         """
         images = None
         futures = []
-        for x in range(self.codex_object.metadata['nx'] + 1):
+        for x in range(self.codex_object.metadata['nx']):
             images_temp = None
             if (x + 1) % 2 == 0:
-                y_range = range(self.codex_object.metadata['ny'], -1, -1)
+                y_range = range(self.codex_object.metadata['ny'] - 1, -1, -1)
             else:
-                y_range = range(self.codex_object.metadata['ny'] + 1)
+                y_range = range(self.codex_object.metadata['ny'])
 
             for y in y_range:
                 if self.codex_object.metadata['real_tiles'][x,y]=='x':
@@ -222,10 +222,8 @@ class ProcessCodex:
         final_correlation_list = []
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
-
                 if self.codex_object.metadata['real_tiles'][x,y]=='x':
                     continue
-
                 xoff, yoff = shift_list[x + 3 * y]
                 image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
@@ -254,7 +252,6 @@ class ProcessCodex:
         print("Flatfield has shape {} and darkfield has shape {}".format(flatfield.shape, darkfield.shape))
         np.save(file='flatfield.npy', arr=flatfield)
         np.save(file='darkfield.npy', arr=darkfield)
-
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
                 image_subset = image[x * width:(x + 1) * width, y * width: (y + 1) * width]

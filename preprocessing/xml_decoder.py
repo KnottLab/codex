@@ -30,16 +30,10 @@ class XMLDecoder:
         px = []
         py = []
 
-        x = 0
-        y = 0
         for tile in attachment.findall('Tile'):
-            # This is weird as it's flipped
-            x = max(int(tile.get('FieldY')), x)
-            y = max(int(tile.get('FieldX')), y)
-
             # flip X and Y here too??
-            px.append(tile.get('PosX'))
-            py.append(tile.get('PosY'))
+            px.append(tile.get('PosY'))
+            py.append(tile.get('PosX'))
 
         positions = [(i,j) for i,j in zip(px,py)]
         Upx = np.unique(px)

@@ -14,6 +14,23 @@ class Tile:
         self.x_off = 0
         self.y_off = 0
 
+    def __str__(self):
+      s = f'Tile at x={self.x} y={self.y}'
+      s += f'\n\tx_off={self.x_off} y_off={self.y_off}'
+      if self._neighbors is not None:
+        s += f'\n\tneighbors: {len(self._neighbors)}'
+      else:
+        s += '\n\tno neighbors found'
+
+      if self._registration_details is not None:
+        for k,v in self._registration_details.items():
+          s += f'\n\t--> {k}: {v}'
+      else:
+        s += '\n\tno registration details'
+
+      s += '\n'
+      return s
+
     @property
     def stitching_index(self):
         return self._stitching_index
