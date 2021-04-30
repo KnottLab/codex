@@ -5,6 +5,7 @@
 # Step 1: Pre-processing
 
 from model import codex, metadata
+from model.tile import Tile
 from preprocessing import process_codex_images, xml_decoder, stitching
 import pandas as pd
 from pathlib import Path
@@ -170,9 +171,11 @@ if __name__ == '__main__':
 
             else:
                 tiles = stitching_object.tiles.flatten()
-                tile_perm = np.argsort([t.stitching_index for t in tiles])
+                tile_perm = np.argsort([t.stitching_index if isinstance(t, Tile) else 999 for t in tiles])
                 #tiles.sort(key=lambda t:t.stitching_index)
                 for tile in tiles[tile_perm]:
+                    if not isinstance(tile, Tile):
+                        continue
                     j, m, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], 
                                                                codex_object.metadata['width'], j, m, None, tile, 
                                                                tile.x_off, tile.y_off)

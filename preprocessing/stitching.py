@@ -69,6 +69,8 @@ class Stitching:
         max_correlation = 0
         first_tile = self._tiles.ravel()[0]
         for tile in self._tiles.ravel()[1:len(self._tiles) - 1]:
+            if not isinstance(tile, Tile):
+              continue
             correlation_list = []
             for other_tile_id, registration in tile.registration_details.items():
                 correlation = registration.get('final_correlation')
@@ -156,6 +158,8 @@ class Stitching:
         self.calculate_neighbors()
         futures = []
         for tile in self._tiles.ravel():
+            if not isinstance(tile, Tile):
+              continue
             registration_transform_dict = {}
             for neighbor in tile.neighbors:
                 fn = get_registration_transform.remote(tile.x, tile.y, neighbor[0],
@@ -166,6 +170,8 @@ class Stitching:
         reg_info = ray.get(futures)
         i = 0
         for tile in self._tiles.ravel():
+            if not isinstance(tile, Tile):
+              continue
             registration_transform_dict = {}
             for neighbor in tile.neighbors:
                 initial_corr, final_corr, xoff, yoff = reg_info[i]
@@ -232,6 +238,7 @@ class Stitching:
                 kernel = octagon(1, 1)
                 dilated_image = cv2.dilate(neighbor_image, kernel, iterations=1)
                 dilated_image = dilated_image - neighbor_image
+                dilated_image[self.codex_object.metadata['real_tiles']=='x'] = 0
                 neighbor_indices = np.argwhere(dilated_image == 1)
                 tile = Tile(x, y)
                 tile.neighbors = neighbor_indices

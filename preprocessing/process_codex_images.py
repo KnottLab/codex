@@ -100,22 +100,31 @@ class ProcessCodex:
 
             for y in y_range:
                 if self.codex_object.metadata['real_tiles'][x,y]=='x':
-                    continue
-                image = edof_images[k]
+                    image = np.zeros((self.codex_object.metadata['tileWidth'], 
+                                      self.codex_object.metadata['tileWidth']),
+                                     dtype=np.uint16)
+                else:
+                    image = edof_images[k]
+                    k += 1
+
+
                 if images_temp is None: # Build row
                     images_temp = image
                 else:
+                    #print(f'concatenating images: {image.shape} {images_temp.shape}')
                     if (x + 1) % 2 == 0:
                         images_temp = np.concatenate((image, images_temp), 1)
                     else:
+                        #print(f'concatenating images: {images_temp.shape} {image.shape}')
                         images_temp = np.concatenate((images_temp, image), 1)
-                print(k, images_temp.shape)
-                k += 1
+                print(f'building row {images_temp.shape}')
 
             if images is None:
                 images = images_temp
             else:
-                images = np.concatenate((images, images_temp))
+                #print(f'concatenating rows: {images.shape} {images_temp.shape}')
+                images = np.concatenate((images, images_temp), 0)
+            print(f'building columns {images.shape} placed {k} tiles so far')
             print(images.shape)
 
         return images
