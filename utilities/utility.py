@@ -29,13 +29,21 @@ def num2str(x, version='1'):
             x = str(x)
     return x
 
+def image_as_uint8(image):
+    image = image.astype('float')
+    div = np.quantile(image, 0.9999)
+    image[image > div] = div
+    image /= div
+    image *= 255
+    return image.astype('uint8')
+
 
 def read_tile_at_z(codex_obj, cl, ch, x, y, z):
     if codex_obj.metadata['cycle_folders']:
         # Areas consisting of a single tile are called 'Position' instead of 'Region'
         if codex_obj.metadata['Ntiles'] == 1:
             path = str(codex_obj.metadata['cycle_folders'][
-                cl]) + '/TileScan 1--Z' + num2str(z, version='2') + '--C' + f'{ch:03d}' + '.tif'
+                cl]) + '/TileScan 1--Z' + num2str(z, version='2') + '--C' + f'{ch:02d}' + '.tif'
 
         elif codex_obj.region == '0':
             path = str(codex_obj.metadata['cycle_folders'][
@@ -45,10 +53,10 @@ def read_tile_at_z(codex_obj, cl, ch, x, y, z):
 
         else:
             path = str(codex_obj.metadata['cycle_folders'][cl]) + \
-                '/TileScan 1/Region ' + codex_obj.region +\
+                '/TileScan 1' + '/Region ' + str(codex_obj.region) +\
                 '--Stage' + codex_obj.metadata['real_tiles'][x,y] + \
-                '--Z' + f'{z:03d}' + \
-                '--C' + f'{ch:03d}' + '.tif'
+                '--Z' + f'{z:02d}' + \
+                '--C' + f'{ch:02d}' + '.tif'
 
     else:
         path = codex_obj.data_path + '/' + codex_obj.sample_id + '/cyc' + num2str(cl) + '_reg00' + num2str(

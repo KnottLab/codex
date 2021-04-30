@@ -3,6 +3,7 @@
 import xml.etree.ElementTree as ET
 import numpy as np
 import math
+import sys
 
 
 class XMLDecoder:
@@ -36,6 +37,7 @@ class XMLDecoder:
             py.append(tile.get('PosX'))
 
         positions = [(i,j) for i,j in zip(px,py)]
+        print("Tile positions are {0}".format(positions))
         Upx = np.unique(px)
         Upy = np.unique(py)
 
@@ -49,13 +51,16 @@ class XMLDecoder:
         # 08 07 06 05
         # 09 10 11 12
         tile_num = 0 # start tile numbering at 0
-        for j in range(y):
-            Rx = np.arange(x) if j%2==0 else np.arange(x)[::-1]
-            for i in Rx:
-                if (Upx[i], Upy[j]) in positions:
-                    real_tiles[i,j] = f'{tile_num:03d}'
+        print("Real tiles are {0}".format(real_tiles))
+        for j in range(x):
+            Ry = np.arange(y) if j%2==0 else np.arange(y)[::-1]
+            for i in Ry:
+                if (Upx[j], Upy[i]) in positions:
+                    real_tiles[j, i] = f'{tile_num:02d}'
+                    tile_num += 1
 
         Ntiles = len(positions)
+        print("X {0} Y {1} Ntiles {2} Real tiles {3}".format(x, y, Ntiles, real_tiles))
         return x, y, real_tiles, Ntiles
 
     def _number_of_z_stacks(self, root):

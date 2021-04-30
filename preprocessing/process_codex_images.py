@@ -99,9 +99,14 @@ class ProcessCodex:
                 if images_temp is None:
                     images_temp = image
                 else:
-                    images_temp = np.concatenate((images_temp, image), 1)
+                    if (x + 1) % 2 == 0:
+                        images_temp = np.concatenate((image, images_temp), 1)
+                    else:
+                        images_temp = np.concatenate((images_temp, image), 1)
+
                 print(images_temp.shape)
                 k += 1
+
 
             if images is None:
                 images = images_temp
@@ -136,7 +141,7 @@ class ProcessCodex:
         b = 1 - a
         image = image - a * background_1 - b * background_2
         image = image + 1
-        image[not (image > 0 and background_1 > 0 and background_2 > 0)] = 0
+        image[np.logical_not(np.logical_and(np.logical_and(image > 0, background_1 > 0), background_2 > 0))] = 0
         return image
 
     def cycle_alignment_get_transform(self, image_ref, image):
@@ -198,7 +203,7 @@ class ProcessCodex:
             for y in range(self.codex_object.metadata['ny']):
                 if self.codex_object.metadata['real_tiles'][x,y]=='x':
                     continue
-                xoff, yoff = shift_list[x + 3 * y]
+                xoff, yoff = shift_list[x + self.codex_object.metadata['nx'] * y]
                 image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 initial_correlation = corr2(image_ref_subset, image_subset)
@@ -226,6 +231,8 @@ class ProcessCodex:
         np.save(file='darkfield.npy', arr=darkfield)
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
+                if self.codex_object.metadata['real_tiles'][x,y] == 'x':
+                     continue
                 image_subset = image[x * width:(x + 1) * width, y * width: (y + 1) * width]
                 image[x * width: (x+1) * width, y * width : (y+1) * width] = ((image_subset.astype('double') - darkfield) / flatfield).astype('uint16')
 
