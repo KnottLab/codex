@@ -53,7 +53,8 @@ class XMLDecoder:
             Rx = np.arange(x) if j%2==0 else np.arange(x)[::-1]
             for i in Rx:
                 if (Upx[i], Upy[j]) in positions:
-                    real_tiles[i,j] = f'{tile_num:03d}'
+                    real_tiles[j,i] = f'{tile_num:02d}'
+                    tile_num += 1
 
         Ntiles = len(positions)
         return x, y, real_tiles, Ntiles
@@ -155,7 +156,7 @@ class XMLDecoder:
         self.decoded_content['wavelengths'] = self._get_wavelengths(root_xml)
         self.decoded_content['resolution'] = self._get_resolutionh(root_xlif)
         self.decoded_content['marker_names'], self.decoded_content['markers'], \
-        self.decoded_content['maker_array'], self.decoded_content['marker_names_array'] = self._get_marker_names(
+        self.decoded_content['marker_array'], self.decoded_content['marker_names_array'] = self._get_marker_names(
             root_xml, self.decoded_content['ncl'],
             self.decoded_content['nch'])
 

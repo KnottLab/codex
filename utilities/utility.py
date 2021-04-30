@@ -45,10 +45,10 @@ def read_tile_at_z(codex_obj, cl, ch, x, y, z):
 
         else:
             path = str(codex_obj.metadata['cycle_folders'][cl]) + \
-                '/TileScan 1/Region ' + codex_obj.region +\
+                '/TileScan 1/Region ' + str(codex_obj.region) +\
                 '--Stage' + codex_obj.metadata['real_tiles'][x,y] + \
-                '--Z' + f'{z:03d}' + \
-                '--C' + f'{ch:03d}' + '.tif'
+                '--Z' + f'{z:02d}' + \
+                '--C' + f'{ch:02d}' + '.tif'
 
     else:
         path = codex_obj.data_path + '/' + codex_obj.sample_id + '/cyc' + num2str(cl) + '_reg00' + num2str(

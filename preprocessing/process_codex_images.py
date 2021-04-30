@@ -7,7 +7,7 @@ from image_registration.fft_tools import shift
 from skimage.morphology import octagon
 import cv2
 import ray
-from pybasic.pybasic import basic
+from pybasic import basic
 
 
 class ProcessCodex:
@@ -73,9 +73,8 @@ class ProcessCodex:
         images = None
         futures = []
         for x in range(self.codex_object.metadata['nx']):
-            images_temp = None
             if (x + 1) % 2 == 0:
-                y_range = range(self.codex_object.metadata['ny'] - 1, -1, -1)
+                y_range = range(self.codex_object.metadata['ny']-1, -1, -1)
             else:
                 y_range = range(self.codex_object.metadata['ny'])
 
@@ -84,27 +83,33 @@ class ProcessCodex:
                     continue
                 print("Building remote function for : " + self.codex_object.metadata['marker_names_array'][cl][ch] + \
                       " CL: " + str(cl) + " CH: " + str(ch) + " X: " + str(x) + " Y: " + str(y))
+
                 futures.append(edof_loop.remote(self.codex_object, cl, ch, x, y))
+
 
         print("Running EDOF functions remotely")
         edof_images = ray.get(futures)
         k = 0
-        for x in range(self.codex_object.metadata['nx'] + 1):
+        print("Assembling EDOF images for channel")
+        for x in range(self.codex_object.metadata['nx']):
             images_temp = None
             if (x + 1) % 2 == 0:
-                y_range = range(self.codex_object.metadata['ny'], -1, -1)
+                y_range = range(self.codex_object.metadata['ny']-1, -1, -1)
             else:
-                y_range = range(self.codex_object.metadata['ny'] + 1)
+                y_range = range(self.codex_object.metadata['ny'])
 
             for y in y_range:
                 if self.codex_object.metadata['real_tiles'][x,y]=='x':
                     continue
                 image = edof_images[k]
-                if images_temp is None: # Build column
+                if images_temp is None: # Build row
                     images_temp = image
                 else:
-                    images_temp = np.concatenate((images_temp, image), 1)
-                print(images_temp.shape)
+                    if (x + 1) % 2 == 0:
+                        images_temp = np.concatenate((image, images_temp), 1)
+                    else:
+                        images_temp = np.concatenate((images_temp, image), 1)
+                print(k, images_temp.shape)
                 k += 1
 
             if images is None:
@@ -141,7 +146,7 @@ class ProcessCodex:
         b = 1 - a
         image = image - a * background_1 - b * background_2
         image = image + 1
-        image[not (image > 0 and background_1 > 0 and background_2 > 0)] = 0
+        image[np.logical_not(np.logical_and(np.logical_and(image > 0, background_1 > 0), background_2 > 0))] = 0
         return image
 
     # @ray.remote
@@ -166,26 +171,34 @@ class ProcessCodex:
         Args:
             image: A DAPI channel image from any cycle after the first
         """
+
+        print("Putting image_ref and image into RAY shared memory")
+        image_ref_shared = ray.put(image_ref)
+        image_shared = ray.put(image)
+
         width = self.codex_object.metadata['tileWidth']
-        shift_list = []
-        initial_correlation_list = []
-        final_correlation_list = []
         futures = []
         print("Making cycle alignment jobs")
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
                 if self.codex_object.metadata['real_tiles'][x,y]=='x':
                     continue
-                futures.append(get_transform.remote(image_ref, image, x, y, width))
+                futures.append(get_transform.remote(image_ref_shared, image_shared, x, y, width))
 
         print("Running cycle alignment jobs remotely")
         alignment_info = ray.get(futures)
         k = 0
+        shift_list = []
+        initial_correlation_list = []
+        final_correlation_list = []
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
-                if self.codex_object.metadata['real_tiles'][x,y]=='':
+                if self.codex_object.metadata['real_tiles'][x,y]=='x':
                     continue
                 xoff, yoff, initial_correlation, final_correlation = alignment_info[k]
+
+                image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
+                image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
 
                 shift_list.append((xoff, yoff))
                 initial_correlation_list.append(initial_correlation)
@@ -197,6 +210,10 @@ class ProcessCodex:
         print(shift_list)
         cycle_alignment_info = {"shift": shift_list, "initial_correlation": initial_correlation_list,
                                 "final_correlation": final_correlation_list}
+
+        del image_ref_shared
+        del image_shared
+
         return cycle_alignment_info
 
 
@@ -220,11 +237,14 @@ class ProcessCodex:
         shift_list = cycle_alignment_info.get('shift')
         initial_correlation_list = []
         final_correlation_list = []
+        shift_index = 0
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
                 if self.codex_object.metadata['real_tiles'][x,y]=='x':
                     continue
-                xoff, yoff = shift_list[x + 3 * y]
+                xoff, yoff = shift_list[shift_index] 
+                shift_index += 1
+
                 image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 initial_correlation = corr2(image_ref_subset, image_subset)
@@ -232,6 +252,8 @@ class ProcessCodex:
                 image_subset = shift.shift2d(image_subset, -xoff, -yoff)
                 final_correlation = corr2(image_ref_subset, image_subset)
                 final_correlation_list.append(final_correlation)
+                image[x * width:(x + 1) * width, y * width:(y + 1) * width] = image_subset
+
         return image
 
 
@@ -250,8 +272,6 @@ class ProcessCodex:
         print("Image array has shape {}".format(image_array.shape))
         flatfield, darkfield = basic(images=image_array, segmentation=None)
         print("Flatfield has shape {} and darkfield has shape {}".format(flatfield.shape, darkfield.shape))
-        np.save(file='flatfield.npy', arr=flatfield)
-        np.save(file='darkfield.npy', arr=darkfield)
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
                 image_subset = image[x * width:(x + 1) * width, y * width: (y + 1) * width]
