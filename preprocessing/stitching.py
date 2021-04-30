@@ -49,7 +49,7 @@ class Stitching:
         image_subset = image[first_tile.x * image_width:(first_tile.x + 1) * image_width,
                        first_tile.y * image_width:(first_tile.y + 1) * image_width]
         j = np.zeros((self.codex_object.metadata['nx'] * (image_width - overlap_width) + overlap_width,
-                     self.codex_object.metadata['ny'] * (image_width - overlap_width) + overlap_width))
+                     self.codex_object.metadata['ny'] * (image_width - overlap_width) + overlap_width), dtype=np.uint16)
         m = np.zeros((self.codex_object.metadata['nx'] * (image_width - overlap_width) + overlap_width,
                      self.codex_object.metadata['ny'] * (image_width - overlap_width) + overlap_width))
         j[first_tile.x * (image_width - overlap_width):(first_tile.x + 1) * (image_width - overlap_width) + overlap_width,

@@ -161,17 +161,12 @@ if __name__ == '__main__':
                                                                tile_2.x_off, tile_2.y_off)
                     k += 1
 
-                # Correct corners
-                dilated_m = cv2.dilate(m, octagon(1, 1), iterations=1)
-                m = ((dilated_m - m) > 0).astype('uint8')
-                m = cv2.dilate(m, octagon(1, 2), iterations=1)
-                jf = ndimage.uniform_filter(j, size=5, mode='constant')
-                j[m > 0] = jf[m > 0]
-                #div = np.quantile(j, 0.9999)
-                #j[j > div] = div
-                #j /= div
-                #j *= 255
-                #j = j.astype('uint8')
+                ## Correct corners
+                #dilated_m = cv2.dilate(m, octagon(1, 1), iterations=1)
+                #m = ((dilated_m - m) > 0).astype('uint8')
+                #m = cv2.dilate(m, octagon(1, 2), iterations=1)
+                #jf = ndimage.uniform_filter(j, size=5, mode='constant')
+                #j[m > 0] = jf[m > 0]
 
             else:
                 tiles = stitching_object.tiles.flatten()

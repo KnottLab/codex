@@ -147,7 +147,8 @@ class ProcessCodex:
         image = image - a * background_1 - b * background_2
         image = image + 1
         image[np.logical_not(np.logical_and(np.logical_and(image > 0, background_1 > 0), background_2 > 0))] = 0
-        return image
+
+        return image.astype(np.uint16)
 
     # @ray.remote
     # def _get_transform(self, image_ref, image, x, y, width):
