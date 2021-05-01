@@ -227,7 +227,7 @@ class ProcessCodex:
         return cycle_alignment_info
 
 
-    def cycle_alignment_apply_transform(self, image_ref, image, cycle_alignment_info):
+    def cycle_alignment_apply_transform(self, image_ref, image, cycle_alignment_info, cycle, channel, cycle_alignment_dict):
         """ Get and stash a cycle alignment transformation
 
         Assert that self.codex_object.cycle_alginment{cl} exists
@@ -245,9 +245,14 @@ class ProcessCodex:
         print("Applying cycle alignment")
         width = self.codex_object.metadata['tileWidth']
         shift_list = cycle_alignment_info.get('shift')
-        initial_correlation_list = []
-        final_correlation_list = []
         shift_index = 0
+        x_list = cycle_alignment_dict.get('x_coordinate')
+        y_list = cycle_alignment_dict.get('y_coordinate')
+        cycle_list = cycle_alignment_dict.get('cycle')
+        channel_list = cycle_alignment_dict.get('channel')
+        initial_corr_list = cycle_alignment_dict.get('initial_correlation')
+        final_corr_list = cycle_alignment_dict.get('final_correlation')
+        
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
                 if self.codex_object.metadata['real_tiles'][x,y]=='x':
@@ -258,13 +263,17 @@ class ProcessCodex:
                 image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 initial_correlation = corr2(image_ref_subset, image_subset)
-                initial_correlation_list.append(initial_correlation)
                 image_subset = shift.shift2d(image_subset, -xoff, -yoff)
                 final_correlation = corr2(image_ref_subset, image_subset)
-                final_correlation_list.append(final_correlation)
                 image[x * width:(x + 1) * width, y * width:(y + 1) * width] = image_subset
+                x_list.append(x)
+                y_list.append(y)
+                cycle_list.append(cycle)
+                channel_list.append(channel)
+                initial_corr_list.append(initial_correlation)
+                final_corr_list.append(final_correlation)
 
-        return image
+        return image, cycle_alignment_dict
 
 
     def shading_correction(self, image, cycle, channel):

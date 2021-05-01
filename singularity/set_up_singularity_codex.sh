@@ -8,11 +8,11 @@ python --version
 
 pip3 install pytest
 
-pybasic_path=/home/ingn/software/pybasic 
-codex_path=/home/ingn/devel/codex
+pybasic_path=/common/shaha4/shaha4/codex/pybasic 
+codex_path=/common/shaha4/shaha4/codex
 
 # copy pybasic to temporary storage ? 
-pbprefix=/common/ingn/tmp/pybasic_$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+pbprefix=/common/shaha4/tmp/pybasic_$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 mkdir $pbprefix
 echo "copying pybasic to ${pbprefix}"
 cp -r $pybasic_path $pbprefix
@@ -27,11 +27,11 @@ pwd
 TZ=America/Los_Angeles date
 
 #python3 -c "import pybasic; print('success!')"
-PYTHONPATH=${codex_path} python3 ./main.py $@
+PYTHONPATH=${codex_path} python3 ../src/main.py $@
 
 TZ=America/Los_Angeles date
 
 echo "removing pybasic from $pbprefix"
-rm -r $pbprefix
+rm -rf $pbprefix
 echo "done"
 
