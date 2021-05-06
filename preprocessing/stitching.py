@@ -160,7 +160,6 @@ class Stitching:
         for tile in self._tiles.ravel():
             if not isinstance(tile, Tile):
               continue
-            registration_transform_dict = {}
             for neighbor in tile.neighbors:
                 fn = get_registration_transform.remote(tile.x, tile.y, neighbor[0],
                                                        neighbor[1], image_shared, image_width,
