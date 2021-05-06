@@ -1,6 +1,6 @@
 """Class for processing codex images"""
 import numpy as np
-from utilities.utility import read_tile_at_z, corr2
+from utilities.utility import read_tile_at_z, corr2, time_this
 from .edof import edof_loop
 from image_registration import chi2_shift
 from image_registration.fft_tools import shift
@@ -56,6 +56,7 @@ class ProcessCodex:
     def __init__(self, codex_object):
         self.codex_object = codex_object
 
+    @time_this
     def apply_edof(self, cl, ch, processor='CPU'):
         """ Select in-focus planes from a z-stack
 
@@ -129,7 +130,7 @@ class ProcessCodex:
 
         return images
 
-
+    @time_this
     def background_subtraction(self, image, background_1, background_2, cycle, channel):
         """ Apply background subtraction 
 
@@ -170,7 +171,8 @@ class ProcessCodex:
     #     initial_correlation = corr2(image_subset, image_ref_subset)
     #     final_correlation = corr2(image_subset, image_ref_subset)
     #     return xoff, yoff, initial_correlation, final_correlation
-
+    
+    @time_this
     def cycle_alignment_get_transform(self, image_ref, image):
         """ Get and stash a cycle alignment transformation
 
@@ -226,8 +228,8 @@ class ProcessCodex:
 
         return cycle_alignment_info
 
-
-    def cycle_alignment_apply_transform(self, image_ref, image, cycle_alignment_info):
+    @time_this
+    def cycle_alignment_apply_transform(self, image_ref, image, cycle_alignment_info, cycle, channel, cycle_alignment_dict):
         """ Get and stash a cycle alignment transformation
 
         Assert that self.codex_object.cycle_alginment{cl} exists
@@ -245,9 +247,14 @@ class ProcessCodex:
         print("Applying cycle alignment")
         width = self.codex_object.metadata['tileWidth']
         shift_list = cycle_alignment_info.get('shift')
-        initial_correlation_list = []
-        final_correlation_list = []
         shift_index = 0
+        x_list = cycle_alignment_dict.get('x_coordinate')
+        y_list = cycle_alignment_dict.get('y_coordinate')
+        cycle_list = cycle_alignment_dict.get('cycle')
+        channel_list = cycle_alignment_dict.get('channel')
+        initial_corr_list = cycle_alignment_dict.get('initial_correlation')
+        final_corr_list = cycle_alignment_dict.get('final_correlation')
+        
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
                 if self.codex_object.metadata['real_tiles'][x,y]=='x':
@@ -258,15 +265,19 @@ class ProcessCodex:
                 image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 initial_correlation = corr2(image_ref_subset, image_subset)
-                initial_correlation_list.append(initial_correlation)
                 image_subset = shift.shift2d(image_subset, -xoff, -yoff)
                 final_correlation = corr2(image_ref_subset, image_subset)
-                final_correlation_list.append(final_correlation)
                 image[x * width:(x + 1) * width, y * width:(y + 1) * width] = image_subset
+                x_list.append(x)
+                y_list.append(y)
+                cycle_list.append(cycle)
+                channel_list.append(channel)
+                initial_corr_list.append(initial_correlation)
+                final_corr_list.append(final_correlation)
 
-        return image
+        return image, cycle_alignment_dict
 
-
+    @time_this
     def shading_correction(self, image, cycle, channel):
         image_list = []
         print("Shading correction started for cycle {} and channel {}".format(cycle, channel))

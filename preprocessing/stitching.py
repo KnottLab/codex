@@ -5,7 +5,7 @@ from skimage.morphology import octagon
 from model.tile import Tile
 from image_registration import chi2_shift
 from image_registration.fft_tools import shift
-from utilities.utility import corr2
+from utilities.utility import corr2, time_this
 import ray
 
 
@@ -45,6 +45,7 @@ class Stitching:
     def tiles(self):
         del self._tiles
 
+    @time_this
     def stitch_first_tile(self, first_tile, image, image_width, overlap_width):
         image_subset = image[first_tile.x * image_width:(first_tile.x + 1) * image_width,
                        first_tile.y * image_width:(first_tile.y + 1) * image_width]
@@ -63,7 +64,8 @@ class Stitching:
         mask[first_tile.x, first_tile.y] = 1
 
         return j, m, mask
-
+   
+    @time_this
     def find_first_tile(self):
         print("Finding the first tile")
         max_correlation = 0
@@ -82,6 +84,7 @@ class Stitching:
 
         return first_tile
 
+    @time_this
     def stitch_tiles(self, image, image_width, overlap_width, j, m, mask, tile_2, x_off, y_off):
         x_2, y_2 = tile_2.x, tile_2.y
         image_subset = image[x_2*image_width : (x_2 + 1) * image_width, y_2 * image_width : (y_2 + 1) * image_width]
@@ -126,7 +129,7 @@ class Stitching:
 
         return j, m, mask
 
-
+    @time_this
     def find_tile_pairs(self, mask):
         tile_indices = np.argwhere(mask > 0)
         max_correlation = 0
@@ -152,18 +155,19 @@ class Stitching:
         registration = tile_2.registration_details[(tile_1.x,tile_1.y)]
         return tile_1, tile_2, registration
 
-
-    def init_stitching(self, image_shared, image_width, overlap_width):
+    @time_this
+    def init_stitching(self, image_shared, image_width, overlap_width, overlap_directory):
         # Step 1: calculate neighbors for each tile
         self.calculate_neighbors()
         futures = []
+        stitching_dict = {'tile_x':[], 'tile_y':[],  'neighbor_x': [], 'neighbor_y': [],  'initial_correlation': [], 'final_correlation': []}
         for tile in self._tiles.ravel():
             if not isinstance(tile, Tile):
               continue
             for neighbor in tile.neighbors:
                 fn = get_registration_transform.remote(tile.x, tile.y, neighbor[0],
                                                        neighbor[1], image_shared, image_width,
-                                                       overlap_width)
+                                                       overlap_width, overlap_directory)
                 futures.append(fn)
 
         reg_info = ray.get(futures)
@@ -178,8 +182,16 @@ class Stitching:
                 registration_transform = {"initial_correlation": initial_corr, "final_correlation": final_corr,
                                           "xoff": xoff, "yoff": yoff}
                 registration_transform_dict[(neighbor[0], neighbor[1])] = registration_transform
+                stitching_dict['tile_x'].append(tile.x)
+                stitching_dict['tile_y'].append(tile.y)
+                stitching_dict['neighbor_x'].append(neighbor[0])
+                stitching_dict['neighbor_y'].append(neighbor[1])
+                stitching_dict['initial_correlation'].append(initial_corr)
+                stitching_dict['final_correlation'].append(final_corr)
 
             tile.registration_details = registration_transform_dict
+
+        return stitching_dict
 
 
     #@ray.remote
@@ -244,7 +256,7 @@ class Stitching:
                 self.tiles[x,y] = tile
 
 @ray.remote
-def get_registration_transform(x1, y1, x2, y2, image, image_width, overlap_width):
+def get_registration_transform(x1, y1, x2, y2, image, image_width, overlap_width, overlap_directory):
     """Get transform that maximizes correlation between overlaping regions."""
     tile_1 = image[x1 * image_width:(x1 + 1) * image_width, y1 * image_width:(y1 + 1) * image_width]
     tile_2 = image[x2 * image_width:(x2 + 1) * image_width, y2 * image_width:(y2 + 1) * image_width]
@@ -255,31 +267,37 @@ def get_registration_transform(x1, y1, x2, y2, image, image_width, overlap_width
     if x2 > x1: # tile1 below tile2
         overlap_tile_1 = tile_1[image_width - overlap_width:, :]
         overlap_tile_2 = tile_2[:overlap_width, :]
-        overlapping_edge = 'top'
+        overlapping_edge_1 = 'top'
+        overlapping_edge_2 = 'bottom'
     elif x2 < x1: # tile1 above tile2
         overlap_tile_1 = tile_1[:overlap_width, :]
         overlap_tile_2 = tile_2[image_width - overlap_width:, :]
-        overlapping_edge = 'bottom'
+        overlapping_edge_1 = 'bottom'
+        overlapping_edge_2 = 'top'
     elif y2 > y1: # tile1 left of tile2
         overlap_tile_1 = tile_1[:, image_width - overlap_width:]
         overlap_tile_2 = tile_2[:, :overlap_width]
-        overlapping_edge = 'left'
+        overlapping_edge_1 = 'left'
+        overlapping_edge_2 = 'right'
     elif y2 < y1: # tile1 right of tile2
         overlap_tile_1 = tile_1[:, :overlap_width]
         overlap_tile_2 = tile_2[:, image_width - overlap_width:]
-        overlapping_edge = 'right'
+        overlapping_edge_1 = 'right'
+        overlapping_edge_2 = 'left'
 
-    print(f'registering tile2 ({x2},{y2}) to tile1 ({x1},{y1}) on the {overlapping_edge} edge')
-
+    print(f'registering tile2 ({x2},{y2}) to tile1 ({x1},{y1}) on the {overlapping_edge_1} edge')
+    cv2.imwrite(overlap_directory + "/" + f'overlap_tile_reference_{x1}_{y1}_{overlapping_edge_1}.tif', overlap_tile_1)
+    cv2.imwrite(overlap_directory + "/" + f'overlap_tile_original_{x1}_{y1}_{overlapping_edge_1}.tif', overlap_tile_2)
 
     initial_correlation = corr2(overlap_tile_1, overlap_tile_2)
     xoff, yoff, xeoff, yeoff = chi2_shift(overlap_tile_1, overlap_tile_2, return_error=True, upsample_factor='auto')
     shifted_image = shift.shift2d(overlap_tile_2, -xoff, -yoff)
+    cv2.imwrite(overlap_directory + "/" + f'overlap_tile_shifted_{x1}_{y1}_{overlapping_edge_1}.tif', shifted_image)
 
     warped_correlation = corr2(overlap_tile_1[shifted_image > 0], shifted_image[shifted_image > 0])
 
     # For some reason when tiles are stacked vertically, xoff and yoff need to swap
-    if overlapping_edge in ['top', 'bottom']:   # tile1 below tile2
+    if overlapping_edge_1 in ['top', 'bottom']:   # tile1 below tile2
         xoff, yoff = yoff, xoff
     
     return initial_correlation, warped_correlation, xoff, yoff
