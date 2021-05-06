@@ -2,7 +2,25 @@
 import pandas as pd
 import cv2
 import numpy as np
+import time
 
+
+# This is a generic wrapper for any driver function you want to time
+def time_this(f):
+    def timed_wrapper(*args, **kw):
+        start_time = time.time()
+        result = f(*args, **kw)
+        end_time = time.time()
+        if isinstance(result, tuple):
+           result += (end_time - start_time,)
+        else:
+           result = (result, end_time - start_time)
+        print(f"Inside time this function with {result}")
+        # Time taken = end_time - start_time
+        #print('| func:%r args:[%r, %r] took: %2.4f seconds |' % \
+              # (f.__name__, args, kw, end_time - start_time))
+        return result
+    return timed_wrapper
 
 def read_table(path):
     table = pd.read_csv(path)

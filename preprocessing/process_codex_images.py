@@ -1,6 +1,6 @@
 """Class for processing codex images"""
 import numpy as np
-from utilities.utility import read_tile_at_z, corr2
+from utilities.utility import read_tile_at_z, corr2, time_this
 from .edof import edof_loop
 from image_registration import chi2_shift
 from image_registration.fft_tools import shift
@@ -56,6 +56,7 @@ class ProcessCodex:
     def __init__(self, codex_object):
         self.codex_object = codex_object
 
+    @time_this
     def apply_edof(self, cl, ch, processor='CPU'):
         """ Select in-focus planes from a z-stack
 
@@ -129,7 +130,7 @@ class ProcessCodex:
 
         return images
 
-
+    @time_this
     def background_subtraction(self, image, background_1, background_2, cycle, channel):
         """ Apply background subtraction 
 
@@ -170,7 +171,8 @@ class ProcessCodex:
     #     initial_correlation = corr2(image_subset, image_ref_subset)
     #     final_correlation = corr2(image_subset, image_ref_subset)
     #     return xoff, yoff, initial_correlation, final_correlation
-
+    
+    @time_this
     def cycle_alignment_get_transform(self, image_ref, image):
         """ Get and stash a cycle alignment transformation
 
@@ -226,7 +228,7 @@ class ProcessCodex:
 
         return cycle_alignment_info
 
-
+    @time_this
     def cycle_alignment_apply_transform(self, image_ref, image, cycle_alignment_info, cycle, channel, cycle_alignment_dict):
         """ Get and stash a cycle alignment transformation
 
@@ -275,7 +277,7 @@ class ProcessCodex:
 
         return image, cycle_alignment_dict
 
-
+    @time_this
     def shading_correction(self, image, cycle, channel):
         image_list = []
         print("Shading correction started for cycle {} and channel {}".format(cycle, channel))

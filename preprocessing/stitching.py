@@ -5,7 +5,7 @@ from skimage.morphology import octagon
 from model.tile import Tile
 from image_registration import chi2_shift
 from image_registration.fft_tools import shift
-from utilities.utility import corr2
+from utilities.utility import corr2, time_this
 import ray
 
 
@@ -45,6 +45,7 @@ class Stitching:
     def tiles(self):
         del self._tiles
 
+    @time_this
     def stitch_first_tile(self, first_tile, image, image_width, overlap_width):
         image_subset = image[first_tile.x * image_width:(first_tile.x + 1) * image_width,
                        first_tile.y * image_width:(first_tile.y + 1) * image_width]
@@ -63,7 +64,8 @@ class Stitching:
         mask[first_tile.x, first_tile.y] = 1
 
         return j, m, mask
-
+   
+    @time_this
     def find_first_tile(self):
         print("Finding the first tile")
         max_correlation = 0
@@ -82,6 +84,7 @@ class Stitching:
 
         return first_tile
 
+    @time_this
     def stitch_tiles(self, image, image_width, overlap_width, j, m, mask, tile_2, x_off, y_off):
         x_2, y_2 = tile_2.x, tile_2.y
         image_subset = image[x_2*image_width : (x_2 + 1) * image_width, y_2 * image_width : (y_2 + 1) * image_width]
@@ -126,7 +129,7 @@ class Stitching:
 
         return j, m, mask
 
-
+    @time_this
     def find_tile_pairs(self, mask):
         tile_indices = np.argwhere(mask > 0)
         max_correlation = 0
@@ -152,7 +155,7 @@ class Stitching:
         registration = tile_2.registration_details[(tile_1.x,tile_1.y)]
         return tile_1, tile_2, registration
 
-
+    @time_this
     def init_stitching(self, image_shared, image_width, overlap_width, overlap_directory):
         # Step 1: calculate neighbors for each tile
         self.calculate_neighbors()
@@ -284,12 +287,13 @@ def get_registration_transform(x1, y1, x2, y2, image, image_width, overlap_width
         overlapping_edge_2 = 'left'
 
     print(f'registering tile2 ({x2},{y2}) to tile1 ({x1},{y1}) on the {overlapping_edge_1} edge')
-    cv2.imwrite(overlap_directory + "/" + f'overlap_tile_1_{x1}_{y1}_{overlapping_edge_1}.tif', overlap_tile_1)
-    cv2.imwrite(overlap_directory + "/" + f'overlap_tile_2_{x2}_{y2}_{overlapping_edge_2}.tif', overlap_tile_2)
+    cv2.imwrite(overlap_directory + "/" + f'overlap_tile_reference_{x1}_{y1}_{overlapping_edge_1}.tif', overlap_tile_1)
+    cv2.imwrite(overlap_directory + "/" + f'overlap_tile_original_{x1}_{y1}_{overlapping_edge_1}.tif', overlap_tile_2)
 
     initial_correlation = corr2(overlap_tile_1, overlap_tile_2)
     xoff, yoff, xeoff, yeoff = chi2_shift(overlap_tile_1, overlap_tile_2, return_error=True, upsample_factor='auto')
     shifted_image = shift.shift2d(overlap_tile_2, -xoff, -yoff)
+    cv2.imwrite(overlap_directory + "/" + f'overlap_tile_shifted_{x1}_{y1}_{overlapping_edge_1}.tif', shifted_image)
 
     warped_correlation = corr2(overlap_tile_1[shifted_image > 0], shifted_image[shifted_image > 0])
 
