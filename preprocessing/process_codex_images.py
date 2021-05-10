@@ -1,11 +1,10 @@
 """Class for processing codex images"""
 import numpy as np
-from utilities.utility import read_tile_at_z, corr2, time_this
+from utilities.utility import corr2, time_this
 from .edof import edof_loop
 from image_registration import chi2_shift
 from image_registration.fft_tools import shift
 from skimage.morphology import octagon
-from scipy.ndimage import shift as sp_shift
 import cv2
 import ray
 from pybasic import basic
@@ -205,28 +204,15 @@ class ProcessCodex:
         alignment_info = ray.get(futures)
         k = 0
         shift_list = []
-        initial_correlation_list = []
-        final_correlation_list = []
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
                 if self.codex_object.metadata['real_tiles'][x,y]=='x':
                     continue
-                xoff, yoff, initial_correlation, final_correlation = alignment_info[k]
-
-                image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
-                image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
-
+                xoff, yoff = alignment_info[k]
                 shift_list.append((xoff, yoff))
-                initial_correlation_list.append(initial_correlation)
-                # image_subset = shift.shift2d(image_subset, -xoff, -yoff)
-                image_subset = sp_shift(image_subset, (-xoff, -yoff), output=np.uint16, mode='constant', cval=0)
-                final_correlation_list.append(final_correlation)
                 k+=1
 
-        print("Shift list size is: " + str(len(shift_list)))
-        print(shift_list)
-        cycle_alignment_info = {"shift": shift_list, "initial_correlation": initial_correlation_list,
-                                "final_correlation": final_correlation_list}
+        cycle_alignment_info = {"shift": shift_list}
 
         del image_ref_shared
         del image_shared
@@ -245,6 +231,11 @@ class ProcessCodex:
 
         Args:
             image: Any channel image from any cycle after the first
+            image_ref: Reference image from the first channel and cycle
+            cycle_alignment_info: this stores the shifts required to be done
+            cycle: the current cycle
+            channel: the current channel
+            cycle_alignment_dict: dictionary to store metadata about transforms
 
         Returns:
             aligned_image
@@ -270,7 +261,9 @@ class ProcessCodex:
                 image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
                 initial_correlation = corr2(image_ref_subset, image_subset)
-                image_subset = shift.shift2d(image_subset, -xoff, -yoff)
+                transform_matrix = np.float32([[1, 0, -xoff], [0, 1, -yoff]])
+                rows, cols = image_subset.shape
+                image_subset = cv2.warpAffine(image_subset, transform_matrix, (cols, rows))
                 final_correlation = corr2(image_ref_subset, image_subset)
                 image[x * width:(x + 1) * width, y * width:(y + 1) * width] = image_subset
                 x_list.append(x)
@@ -310,10 +303,6 @@ class ProcessCodex:
 def get_transform(image_ref, image, x, y, width):
     image_ref_subset = image_ref[x * width:(x + 1) * width, y * width:(y + 1) * width]
     image_subset = image[x * width:(x + 1) * width, y * width:(y + 1) * width]
-    print(image_subset.shape)
     xoff, yoff, exoff, eyoff = chi2_shift(image_ref_subset, image_subset, return_error=True,
                                             upsample_factor='auto')
-
-    initial_correlation = corr2(image_subset, image_ref_subset)
-    final_correlation = corr2(image_subset, image_ref_subset)
-    return xoff, yoff, initial_correlation, final_correlation
+    return xoff, yoff
