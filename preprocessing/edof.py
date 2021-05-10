@@ -16,11 +16,12 @@ def edof_loop(codex_object, cl, ch, x, y):
             if image is None:
                 raise Exception("Image at above path isn't present")
             image_s[:, :, z] = image
-        image = calculate_focus_stack(image_s)
+        image, success = calculate_focus_stack(image_s)
     else:
       image = None
+      success = False
 
-    return image
+    return image, success
 
 def calculate_focus_stack(image, processor='CPU'):
     """Turn this method into a class if more than one focus stack method is needed"""
@@ -52,7 +53,12 @@ def calculate_focus_stack(image, processor='CPU'):
     phi = 0.5 * (1 + np.tanh(alpha * (signal - sth))) / alpha
 
     if np.isnan(phi).any():
-        print("Cannot create fused image")
+        print("Cannot create fused image -- returning a middle slice")
+        n_imgs = image.shape[-1]
+        index_out = int(n_imgs/2)
+        image_out = image[:,:,index_out]
+        return image_out, False
+
     else:
         phi = ndimage.median_filter(phi, size=(3, 3), mode='constant')
 
@@ -64,7 +70,7 @@ def calculate_focus_stack(image, processor='CPU'):
         normalization_factor = np.sum(f_measure, axis=2)
         fused_image = np.sum((image.astype('float') * f_measure), axis=2) / normalization_factor
 
-        return fused_image.astype('uint16')
+        return fused_image.astype('uint16'), True
 
 
 def calculate_gfocus(image, width_size):

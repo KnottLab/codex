@@ -5,6 +5,7 @@ from .edof import edof_loop
 from image_registration import chi2_shift
 from image_registration.fft_tools import shift
 from skimage.morphology import octagon
+from scipy.ndimage import shift as sp_shift
 import cv2
 import ray
 from pybasic import basic
@@ -71,6 +72,7 @@ class ProcessCodex:
         Returns:
             images (np.uint16): Concatenated images processed by EDOF
         """
+        marker_name = self.codex_object.metadata['marker_names_array'][cl][ch]
         images = None
         futures = []
         for x in range(self.codex_object.metadata['nx']):
@@ -82,7 +84,7 @@ class ProcessCodex:
             for y in y_range:
                 if self.codex_object.metadata['real_tiles'][x,y]=='x':
                     continue
-                print("Building remote function for : " + self.codex_object.metadata['marker_names_array'][cl][ch] + \
+                print("Building remote function for : " + marker_name + \
                       " CL: " + str(cl) + " CH: " + str(ch) + " X: " + str(x) + " Y: " + str(y))
 
                 futures.append(edof_loop.remote(self.codex_object, cl, ch, x, y))
@@ -105,7 +107,9 @@ class ProcessCodex:
                                       self.codex_object.metadata['tileWidth']),
                                      dtype=np.uint16)
                 else:
-                    image = edof_images[k]
+                    image = edof_images[k][0]
+                    success = edof_images[k][1]
+                    print(f'EDOF: {marker_name} cycle={cl} channel={ch} tile x={x} y={y} success={success}')
                     k += 1
 
 
@@ -214,7 +218,8 @@ class ProcessCodex:
 
                 shift_list.append((xoff, yoff))
                 initial_correlation_list.append(initial_correlation)
-                image_subset = shift.shift2d(image_subset, -xoff, -yoff)
+                # image_subset = shift.shift2d(image_subset, -xoff, -yoff)
+                image_subset = sp_shift(image_subset, (-xoff, -yoff), output=np.uint16, mode='constant', cval=0)
                 final_correlation_list.append(final_correlation)
                 k+=1
 
