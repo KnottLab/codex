@@ -5,6 +5,7 @@
 # Step 1: Pre-processing
 
 from model import codex, metadata
+from model.tile import Tile
 from preprocessing import process_codex_images, xml_decoder, stitching
 import pandas as pd
 from pathlib import Path
@@ -12,25 +13,55 @@ import numpy as np
 import pickle as pkl
 import ray
 import sys
+import cv2
+import os
+from skimage.morphology import octagon
+import scipy.ndimage as ndimage
+import argparse
+
+
 
 if __name__ == '__main__':
 
-    dataset_metadata = pd.read_csv(filepath_or_buffer='../utilities/CODEX_dataset_metadata.csv')
+    parser = argparse.ArgumentParser(description='Codex pipeline arguments')
+   
+    parser.add_argument('--data_path', metavar='Data path', type=str, required=True, help='Data path to read CODEX raw data from')
+    parser.add_argument('--sample_id', metavar='Sample ID', type=str, required=True, help='Sample ID for the codex data')
+    parser.add_argument('--output_path', metavar='Output path', type=str, required=True, help='Output path for results')
+    parser.add_argument('--xml_path', metavar='XML file path', type=str, required=True, help='Experiment XML information')
+    parser.add_argument('--region', type=int, required=True, help='Region number from the multiple regions to scan from')
+    parser.add_argument('-j', type=int, default=1, required=False, help='Number of CPUs to use')
+    args = parser.parse_args()
 
-    print(dataset_metadata)
+    codex_object = codex.Codex(data_path=args.data_path, region=args.region, sample_id=args.sample_id)
 
-    codex_object = codex.Codex(dataset=dataset_metadata, index=31)
 
-    print(codex_object)
+    edofdir = f'{args.output_path}/0_edof'
+    shadingdir = f'{args.output_path}/1_shading_correction'
+    cycledir = f'{args.output_path}/2_cycle_alignment'
+    backgrounddir = f'{args.output_path}/3_background_subtract'
+    stitchingdir = f'{args.output_path}/4_stitching'
+    qcdir = f'{args.output_path}/qc'
+    overlap_dir = f'{args.output_path}/overlapping_regions'
+
+    os.makedirs(args.output_path, exist_ok=True)
+    os.makedirs(edofdir, exist_ok=True)
+    os.makedirs(shadingdir, exist_ok=True)
+    os.makedirs(cycledir, exist_ok=True)
+    os.makedirs(backgrounddir, exist_ok=True)
+    os.makedirs(stitchingdir, exist_ok=True)
+    os.makedirs(qcdir, exist_ok=True)
+    os.makedirs(overlap_dir, exist_ok=True)
+
 
     base_path = Path(codex_object.data_path + "/" + codex_object.sample_id)
-
     print("Base path is: " + str(base_path))
 
     cycle_folders = sorted([folder for folder in base_path.iterdir() if folder.is_dir()])
     cycle_folders = cycle_folders[1:]
 
-    xml_file_path = list(base_path.glob('*.xml'))
+    #xml_file_path = list(base_path.glob('*.xml'))
+    xml_file_path = args.xml_path
     if codex_object.region == 0:
         xlif_file_path = cycle_folders[0] / 'Metadata' / 'TileScan 1.xlif'
     else:
@@ -41,7 +72,7 @@ if __name__ == '__main__':
     print("XLIF file path is: " + str(xlif_file_path))
     print("XML file path is: " + str(xml_file_path))
 
-    with open(xml_file_path[0], 'r') as f, open(xlif_file_path, 'r') as g:
+    with open(xml_file_path, 'r') as f, open(xlif_file_path, 'r') as g:
         xml_content = f.read()
         xlif_content = g.read()
 
@@ -63,35 +94,58 @@ if __name__ == '__main__':
     image_ref = None
     first_tile = None
     j = None
-    cycle_range = [0]
+    cycle_range = [0, codex_object.metadata['ncl'] - 1] + list(range(1, codex_object.metadata['ncl'] - 1))
     print("Cycle range is: " + str(cycle_range))
 
     print("Setting up Ray")
-    ray.init(num_cpus=8)
+    ray.init(num_cpus=args.j, logging_level="ERROR")
+    cv2.setNumThreads(0)
+    cycle_alignment_dict = {'cycle': [], 'channel': [], 'x_coordinate': [], 'y_coordinate': [], 'initial_correlation': [], 'final_correlation': []}
+    time_dict = {'cycle': [] , 'channel': [], 'time': [], 'function': []}
 
-    for channel in range(1):
+    for channel in range(codex_object.metadata['nch']):
         for cycle, cycle_index in zip(cycle_range, range(codex_object.metadata['ncl'])):
-            image = process_codex.apply_edof(cycle, channel)
-            print("EDOF done. Saving file.")
-            np.save(file='edof.npy', arr=image)
+            image, time = process_codex.apply_edof(cycle, channel)
+            time_dict['cycle'].append(cycle)
+            time_dict['channel'].append(channel)
+            time_dict['time'].append(time)
+            time_dict['function'].append('EDOF')
+            edofpath = f'{edofdir}/{args.sample_id}_reg{args.region:02d}_cycle{cycle:02d}_channel{channel:02d}_{codex_object.metadata["marker_array"][cycle][channel]}.tif'
+            print(f"EDOF done. Saving file. --> {edofpath}")
+            cv2.imwrite(edofpath, image)
 
-            image_obj_id = ray.put(image)
+
             print("Shading correction reached")
-
-            image = process_codex.shading_correction(image, cycle, channel)
-            np.save(file='shading_correction.npy', arr=image)
+            image, time = process_codex.shading_correction(image, cycle, channel)
+            time_dict['cycle'].append(cycle)
+            time_dict['channel'].append(channel)
+            time_dict['time'].append(time)
+            time_dict['function'].append('Shading correction')
+            shadingpath = f'{shadingdir}/{args.sample_id}_reg{args.region:02d}_cycle{cycle:02d}_channel{channel:02d}_{codex_object.metadata["marker_array"][cycle][channel]}.tif'
+            print(f"shading correction done. Saving file. --> {shadingpath}")
+            cv2.imwrite(shadingpath, image)
 
             if channel == 0 and cycle == 0:
-                image_ref_obj_id = ray.put(image)
-                # image_ref = image
+                print("Reference DAPI image does not need cycle alignment. Stashing image for cycle reference.")
+                image_ref = image.copy()
             elif cycle > 0 and channel == 0:
-                image_obj_id = ray.put(image)
-                cycle_alignment_info = process_codex.cycle_alignment_get_transform(image_ref_obj_id, image_obj_id)
+                cycle_alignment_info, time_1 = process_codex.cycle_alignment_get_transform(image_ref, image)
                 codex_object.cycle_alignment_info.append(cycle_alignment_info)
+                image, cycle_alignment_dict, time_2 = process_codex.cycle_alignment_apply_transform(image_ref, image, cycle_alignment_info, cycle, channel, cycle_alignment_dict)
+                time_dict['cycle'].append(cycle)
+                time_dict['channel'].append(channel)
+                time_dict['time'].append(time_1 + time_2)
+                time_dict['function'].append('Cycle alignment')
             else:
-                image = process_codex.cycle_alignment_apply_transform(image_ref, image,
-                                                                      codex_object.cycle_alignment_info[
-                                                                          cycle_index - 1])
+                image, cycle_alignment_dict, time = process_codex.cycle_alignment_apply_transform(image_ref, image, codex_object.cycle_alignment_info[cycle_index - 1], cycle, channel, cycle_alignment_dict)
+                time_dict['cycle'].append(cycle)
+                time_dict['channel'].append(channel)
+                time_dict['time'].append(time)
+                time_dict['function'].append('Cycle alignment')
+ 
+            cyclepath = f'{cycledir}/{args.sample_id}_reg{args.region:02d}_cycle{cycle:02d}_channel{channel:02d}_{codex_object.metadata["marker_array"][cycle][channel]}.tif'
+            print(f"cycle alignment done. Saving file. --> {cyclepath}")
+            cv2.imwrite(cyclepath, image)
 
             if channel > 0:
                 if cycle == 0:
@@ -99,47 +153,81 @@ if __name__ == '__main__':
                 elif cycle == codex_object.metadata['ncl'] - 1:
                     codex_object.background_2.append(image)
                 else:
-                    image = process_codex.background_subtraction(image, codex_object.background_1[channel - 1],
+                    image, time = process_codex.background_subtraction(image, codex_object.background_1[channel - 1],
                                                                  codex_object.background_2[channel - 1], cycle, channel)
 
-                    print("Background subtraction done")
-                    np.save("background_subtraction_{0}.npy".format(
-                        codex_object.metadata['marker_names_array'][cycle][channel]), image)
-
+                    backgroundpath = f'{backgrounddir}/{args.sample_id}_reg{args.region:02d}_cycle{cycle:02d}_channel{channel:02d}_{codex_object.metadata["marker_array"][cycle][channel]}.tif'
+                    print(f"Background subtraction done. Saving file. --> {backgroundpath}")
+                    cv2.imwrite(backgroundpath, image)
+                    time_dict['cycle'].append(cycle)
+                    time_dict['channel'].append(channel)
+                    time_dict['time'].append(time)
+                    time_dict['function'].append('Background subtraction')
             print("Stitching started")
             if channel == 0 and cycle == 0:
-                tiles = stitching_object.init_stitching(image, image_width=codex_object.metadata['tileWidth'],
-                                                        overlap_width=codex_object.metadata['width'])
-                with open("tiles.pkl", "wb") as f:
-                    pkl.dump(tiles, f)
-                first_tile = stitching_object.find_first_tile()
-                j, m, mask = stitching_object.stitch_first_tile(first_tile, image,
+                image_shared = ray.put(image)
+                stitching_dict, time_init = stitching_object.init_stitching(image_shared, image_width=codex_object.metadata['tileWidth'],
+                                                overlap_width=codex_object.metadata['width'], overlap_directory=overlap_dir)
+                first_tile, time_find = stitching_object.find_first_tile() 
+                j, m, mask, time_first = stitching_object.stitch_first_tile(first_tile, image,
                                                                 codex_object.metadata['tileWidth'],
                                                                 codex_object.metadata['width'])
-                k = 0
+                del image_shared
+                print('First tiles placed. placing the rest of the tiles')
+                first_tile.stitching_index = 0
+                k = 1
+                time_stitch = time_init + time_find + time_first
                 while np.sum(mask) < np.sum(codex_object.metadata['real_tiles']!='x'):
-                    tile_1, tile_2, registration = stitching_object.find_tile_pairs(mask)
+                    tile_1, tile_2, registration, time_pairs = stitching_object.find_tile_pairs(mask)
                     tile_2.x_off = registration.get('xoff') + tile_1.x_off
                     tile_2.y_off = registration.get('yoff') + tile_1.y_off
-                    tile_1.stitching_index = k
-                    k += 1
                     tile_2.stitching_index = k
-                    j, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], 
-                                                            codex_object.metadata['width'], j, mask, tile_2,
-                                                            tile_2.x_off, tile_2.y_off)
+                    j, m, mask, time_tiles = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], 
+                                                               codex_object.metadata['width'], j, m, mask, tile_2,
+                                                               tile_2.x_off, tile_2.y_off)
+                    time_stitch += time_pairs + time_tiles
+                    k += 1
+                
+                print(f"Saving stitching QC file at --> {qcdir}")     
+                stitching_df = pd.DataFrame.from_dict(stitching_dict)
+                stitching_df.to_csv(qcdir + "/stitching_data.csv") 
+                
+                time_dict['cycle'].append(cycle)
+                time_dict['channel'].append(channel)
+                time_dict['time'].append(time_stitch)
+                time_dict['function'].append('Stitching')
+                ## Correct corners
+                #dilated_m = cv2.dilate(m, octagon(1, 1), iterations=1)
+                #m = ((dilated_m - m) > 0).astype('uint8')
+                #m = cv2.dilate(m, octagon(1, 2), iterations=1)
+                #jf = ndimage.uniform_filter(j, size=5, mode='constant')
+                #j[m > 0] = jf[m > 0]
+
             else:
-                tiles = stitching_object.tiles
-                tiles.sort(key=lambda t:t.stitching_index)
-                print('Tiles array is {0}'.format(tiles))
-                for tile in tiles:
-                    j, mask = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], 
-                                                            codex_object.metadata['width'], j, None, tile, 
-                                                            tile.x_off, tile.y_off)
+                tiles = stitching_object.tiles.flatten()
+                tile_perm = np.argsort([t.stitching_index if isinstance(t, Tile) else 999 for t in tiles])
+                #tiles.sort(key=lambda t:t.stitching_index)i
+                tiles = tiles[tile_perm]
+                j, m, mask, time_stitch = stitching_object.stitch_first_tile(tiles[0], image, codex_object.metadata['tileWidth'], codex_object.metadata['width'])
+                for tile in tiles[1:]:
+                    if not isinstance(tile, Tile):
+                        continue
+                    j, m, mask, time_tiles = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], 
+                                                               codex_object.metadata['width'], j, m, None, tile, 
+                                                               tile.x_off, tile.y_off)
+                    time_stitch += time_tiles
 
-            print("Stitching done")
-            with open("stitch.pkl", "wb") as f:
-                pkl.dump(f, j)
-            print("Stitching file saved")
+                time_dict['cycle'].append(cycle)
+                time_dict['channel'].append(channel)
+                time_dict['time'].append(time_stitch)
+                time_dict['function'].append('Stitching')
 
-            # clear image data
-            del image_obj_id
+            stitchingpath = f'{stitchingdir}/{args.sample_id}_reg{args.region:02d}_cycle{cycle:02d}_channel{channel:02d}_{codex_object.metadata["marker_array"][cycle][channel]}.tif'
+            print(f"Stitching done. Saving file. --> {stitchingpath}")
+            print(f"Saving cycle alignment file at ---> {qcdir}")
+            cycle_alignment_df = pd.DataFrame.from_dict(cycle_alignment_dict)
+            cycle_alignment_df.to_csv(qcdir + "/cycle_alignment.csv")
+            cv2.imwrite(stitchingpath, j)
+            time_df = pd.DataFrame.from_dict(time_dict)
+            time_df.to_csv(qcdir + "/time_info.csv")
+
