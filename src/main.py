@@ -1,7 +1,6 @@
 """Main script to perform steps"""
 
 # Break this file atomically once we implement new steps
-
 # Step 1: Pre-processing
 
 from model import codex, metadata
@@ -16,6 +15,7 @@ import cv2
 from skimage.morphology import octagon
 import scipy.ndimage as ndimage
 import argparse
+
 
 if __name__ == '__main__':
 

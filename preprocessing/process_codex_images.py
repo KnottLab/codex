@@ -110,7 +110,10 @@ class ProcessCodex:
             if images is None:
                 images = images_temp
             else:
-                images = np.concatenate((images, images_temp))
+                if (x + 1) % 2 == 0: # odd rows assemble right --> left
+                    images = np.concatenate((images_temp, images), axis=1)
+                else: # even rows assemble left --> right
+                    images = np.concatenate((images, images_temp), axis=1)
             print(images.shape)
 
         return images
