@@ -19,6 +19,7 @@ from skimage.morphology import octagon
 import scipy.ndimage as ndimage
 import argparse
 
+alphabet = list('abcdefghijklmnopqrstuvwxyz')
 
 
 if __name__ == '__main__':
@@ -31,6 +32,9 @@ if __name__ == '__main__':
     parser.add_argument('--xml_path', metavar='XML file path', type=str, required=True, help='Experiment XML information')
     parser.add_argument('--region', type=int, required=True, help='Region number from the multiple regions to scan from')
     parser.add_argument('-j', type=int, default=1, required=False, help='Number of CPUs to use')
+    parser.add_argument('--debug', action='store_true', help='Whether to make and save intermediate images')
+    parser.add_argument('--short_name', type=str, default=''.join(np.random.choice(alphabet, 5)), 
+                                        help='to make the ray temp dir unique')
     args = parser.parse_args()
 
     codex_object = codex.Codex(data_path=args.data_path, region=args.region, sample_id=args.sample_id)
@@ -41,6 +45,7 @@ if __name__ == '__main__':
     cycledir = f'{args.output_path}/2_cycle_alignment'
     backgrounddir = f'{args.output_path}/3_background_subtract'
     stitchingdir = f'{args.output_path}/4_stitching'
+    stitching_db_dir = f'{args.output_path}/4_stitching_debug'
     qcdir = f'{args.output_path}/qc'
     overlap_dir = f'{args.output_path}/overlapping_regions'
 
@@ -50,6 +55,7 @@ if __name__ == '__main__':
     os.makedirs(cycledir, exist_ok=True)
     os.makedirs(backgrounddir, exist_ok=True)
     os.makedirs(stitchingdir, exist_ok=True)
+    os.makedirs(stitching_db_dir, exist_ok=True)
     os.makedirs(qcdir, exist_ok=True)
     os.makedirs(overlap_dir, exist_ok=True)
 
@@ -98,7 +104,9 @@ if __name__ == '__main__':
     print("Cycle range is: " + str(cycle_range))
 
     print("Setting up Ray")
-    ray.init(num_cpus=args.j, logging_level="ERROR")
+    ray.init(num_cpus=args.j, logging_level="ERROR", _temp_dir=f"/scratch/ingn/tmp/ray_{args.short_name}",
+             object_store_memory=int(6.4e10))
+
     cv2.setNumThreads(0)
     cycle_alignment_dict = {'cycle': [], 'channel': [], 'x_coordinate': [], 'y_coordinate': [], 'initial_correlation': [], 'final_correlation': []}
     time_dict = {'cycle': [] , 'channel': [], 'time': [], 'function': []}
@@ -165,14 +173,14 @@ if __name__ == '__main__':
                     time_dict['function'].append('Background subtraction')
             print("Stitching started")
             if channel == 0 and cycle == 0:
-                image_shared = ray.put(image)
-                stitching_dict, time_init = stitching_object.init_stitching(image_shared, image_width=codex_object.metadata['tileWidth'],
+                image_shared_stitch = ray.put(image)
+                stitching_dict, time_init = stitching_object.init_stitching(image_shared_stitch, image_width=codex_object.metadata['tileWidth'],
                                                 overlap_width=codex_object.metadata['width'], overlap_directory=overlap_dir)
                 first_tile, time_find = stitching_object.find_first_tile() 
                 j, m, mask, time_first = stitching_object.stitch_first_tile(first_tile, image,
                                                                 codex_object.metadata['tileWidth'],
                                                                 codex_object.metadata['width'])
-                del image_shared
+                del image_shared_stitch
                 print('First tiles placed. placing the rest of the tiles')
                 first_tile.stitching_index = 0
                 k = 1
@@ -182,11 +190,20 @@ if __name__ == '__main__':
                     tile_2.x_off = registration.get('xoff') + tile_1.x_off
                     tile_2.y_off = registration.get('yoff') + tile_1.y_off
                     tile_2.stitching_index = k
-                    j, m, mask, time_tiles = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], 
+                    j, m, mask, jdebug_fixed, jdebug_naive, time_tiles = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], 
                                                                codex_object.metadata['width'], j, m, mask, tile_2,
-                                                               tile_2.x_off, tile_2.y_off)
+                                                               tile_2.x_off, tile_2.y_off, debug=args.debug)
                     time_stitch += time_pairs + time_tiles
                     k += 1
+
+                    if args.debug:
+                      stitching_db_path = f'{stitching_db_dir}/{args.sample_id}_reg{args.region:02d}_cycle{cycle:02d}_channel{channel:02d}_{codex_object.metadata["marker_array"][cycle][channel]}_{k:03d}-1.tif'
+                      print(f"Saving debug image. {jdebug_fixed.shape} --> {stitching_db_path}")
+                      cv2.imwrite(stitching_db_path, jdebug_fixed[:,:,::-1])
+
+                      stitching_db_path = f'{stitching_db_dir}/{args.sample_id}_reg{args.region:02d}_cycle{cycle:02d}_channel{channel:02d}_{codex_object.metadata["marker_array"][cycle][channel]}_{k:03d}-2.tif'
+                      print(f"Saving debug image. {jdebug_naive.shape} --> {stitching_db_path}")
+                      cv2.imwrite(stitching_db_path, jdebug_naive[:,:,::-1])
                 
                 print(f"Saving stitching QC file at --> {qcdir}")     
                 stitching_df = pd.DataFrame.from_dict(stitching_dict)
@@ -212,9 +229,10 @@ if __name__ == '__main__':
                 for tile in tiles[1:]:
                     if not isinstance(tile, Tile):
                         continue
-                    j, m, mask, time_tiles = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], 
+                    # make stitching debug functions for the reference image only
+                    j, m, mask, _, _, time_tiles = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], 
                                                                codex_object.metadata['width'], j, m, None, tile, 
-                                                               tile.x_off, tile.y_off)
+                                                               tile.x_off, tile.y_off, debug=False)
                     time_stitch += time_tiles
 
                 time_dict['cycle'].append(cycle)

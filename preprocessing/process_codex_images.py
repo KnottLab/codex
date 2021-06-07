@@ -113,14 +113,14 @@ class ProcessCodex:
 
 
                 if images_temp is None: # Build row
-                    images_temp = image
+                    images_temp = image.copy()
                 else:
                     #print(f'concatenating images: {image.shape} {images_temp.shape}')
                     if (x + 1) % 2 == 0:
-                        images_temp = np.concatenate((image, images_temp), 1)
+                        images_temp = np.concatenate((image.copy(), images_temp), 1)
                     else:
                         #print(f'concatenating images: {images_temp.shape} {image.shape}')
-                        images_temp = np.concatenate((images_temp, image), 1)
+                        images_temp = np.concatenate((images_temp, image.copy()), 1)
                 print(f'building row {images_temp.shape}')
 
             if images is None:

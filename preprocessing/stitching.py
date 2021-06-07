@@ -9,8 +9,12 @@ from utilities.utility import corr2, time_this
 import ray
 
 
-def dumpimg(pth,img):
+def image2uint8(img):
   img = (255*(img/np.max(img.ravel()))).astype(np.uint8)
+  return img
+
+def dumpimg(pth,img):
+  img = image2uint8(img)
   cv2.imwrite(pth, img) 
 
 
@@ -69,7 +73,13 @@ class Stitching:
     def find_first_tile(self):
         print("Finding the first tile")
         max_correlation = 0
-        first_tile = self._tiles.ravel()[0]
+
+        for t in self._tiles.ravel():
+          if isinstance(t, Tile):
+            first_tile = t
+            break
+        #first_tile = self._tiles.ravel()[0]
+
         for tile in self._tiles.ravel()[1:len(self._tiles) - 1]:
             if not isinstance(tile, Tile):
               continue
@@ -82,10 +92,12 @@ class Stitching:
                 max_correlation = avg_correlation
                 first_tile = tile
 
+        print("Found first tile:")
+        print(first_tile)
         return first_tile
 
     @time_this
-    def stitch_tiles(self, image, image_width, overlap_width, j, m, mask, tile_2, x_off, y_off):
+    def stitch_tiles(self, image, image_width, overlap_width, j, m, mask, tile_2, x_off, y_off, debug=False):
         x_2, y_2 = tile_2.x, tile_2.y
         image_subset = image[x_2*image_width : (x_2 + 1) * image_width, y_2 * image_width : (y_2 + 1) * image_width]
         print("x_off= {0:2.3f} y_off= {1:2.3f}".format(x_off, y_off))
@@ -114,9 +126,24 @@ class Stitching:
         # dumpimg('/storage/tmp/stitching/s/1_j.png', j2)
         # dumpimg('/storage/tmp/stitching/s/2_img.png', image_subset)
         
-        # jtmp = np.zeros_like(j) 
-        # jtmp[x_start:x_end, y_start:y_end] = image_subset[:dx, :dy].astype('uint16')
-        # jstack = np.dstack([j, jtmp, np.zeros_like(j)])
+        if debug:
+          jtmp = np.zeros_like(j) 
+          jtmp[x_start:x_end, y_start:y_end] = image_subset[:dx, :dy].astype('uint16')
+          juint = image2uint8(j)
+          jtuint = image2uint8(jtmp)
+          jstack_fixed = np.dstack([juint, jtuint, np.zeros_like(juint)])
+
+          jtmp = np.zeros_like(j) 
+          x_start_naive = x_2*(image_width-overlap_width)
+          y_start_naive = y_2*(image_width-overlap_width)
+          jtmp[x_start_naive:x_start_naive+image_width, y_start_naive:y_start_naive+image_width] = image_subset
+          juint = image2uint8(j)
+          jtuint = image2uint8(jtmp)
+          jstack_naive = np.dstack([juint, jtuint, np.zeros_like(juint)])
+        else:
+          jstack_fixed = None
+          jstack_naive = None
+
         # dumpimg('/storage/tmp/stitching/s/4_j.png', jstack[:,:,::-1])
 
         # j[x_start:x_end, y_start:y_end] += warped_image.astype('uint16') * (j[x_start:x_end, y_start:y_end] == 0).astype('uint16')
@@ -127,7 +154,7 @@ class Stitching:
         if mask is not None:
            mask[x_2, y_2] = 1
 
-        return j, m, mask
+        return j, m, mask, jstack_fixed, jstack_naive
 
     @time_this
     def find_tile_pairs(self, mask):
