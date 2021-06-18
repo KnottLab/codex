@@ -44,17 +44,18 @@ class XMLDecoder:
 
         real_tiles = np.zeros((x,y), dtype=object)
         real_tiles[:] = 'x'
+        print(f'Building real tiles array: {real_tiles.shape}')
         # snakes like this:
         # 01 02 03 04
         # 08 07 06 05
         # 09 10 11 12
         tile_num = 0 # start tile numbering at 0
-        for j in range(y):
-            Rx = np.arange(x) if j%2==0 else np.arange(x)[::-1]
-            for i in Rx:
+        for i in range(x):
+            Ry = np.arange(y) if i%2==0 else np.arange(y)[::-1]
+            for j in Ry:
                 if (Upx[i], Upy[j]) in positions:
-                    real_tiles[i,j] = f'{tile_num:03d}'
-
+                    real_tiles[i,j] = f'{tile_num:02d}'
+                    tile_num += 1
         Ntiles = len(positions)
         return x, y, real_tiles, Ntiles
 
@@ -97,7 +98,7 @@ class XMLDecoder:
         for item in exposure_items[:num_cycles]:
             antibody = item.find('AntiBody').findall('string')
             for a in antibody:
-                marker_names.append(a.text)
+                marker_names.append(a.text.replace('/', '-').replace(' ', '-'))
 
         for i, marker in enumerate(marker_names):
             marker_list.append(marker + '_' + str(i))
@@ -155,7 +156,7 @@ class XMLDecoder:
         self.decoded_content['wavelengths'] = self._get_wavelengths(root_xml)
         self.decoded_content['resolution'] = self._get_resolutionh(root_xlif)
         self.decoded_content['marker_names'], self.decoded_content['markers'], \
-        self.decoded_content['maker_array'], self.decoded_content['marker_names_array'] = self._get_marker_names(
+        self.decoded_content['marker_array'], self.decoded_content['marker_names_array'] = self._get_marker_names(
             root_xml, self.decoded_content['ncl'],
             self.decoded_content['nch'])
 
