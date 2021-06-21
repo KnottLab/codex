@@ -90,7 +90,7 @@ class ProcessCodex:
 
 
         print("Running EDOF functions remotely")
-        edof_images = ray.get(futures)
+        #edof_images = ray.get(futures)
         k = 0
         print("Assembling EDOF images for channel")
         for x in range(self.codex_object.metadata['nx']):
@@ -106,11 +106,17 @@ class ProcessCodex:
                                       self.codex_object.metadata['tileWidth']),
                                      dtype=np.uint16)
                 else:
-                    image = edof_images[k][0]
-                    success = edof_images[k][1]
+                    image_id, success = ray.get(futures[k])
+                    image = ray.get(image_id) 
+                    #image = image.copy()
+
+                    #image = edof_images[k][0].copy()
+                    #success = edof_images[k][1]
                     print(f'EDOF: {marker_name} cycle={cl} channel={ch} tile x={x} y={y} success={success}')
                     k += 1
 
+                #if (cl>0) and (ch>0):
+                #  _ = input('continue')
 
                 if images_temp is None: # Build row
                     images_temp = image.copy()
@@ -147,7 +153,7 @@ class ProcessCodex:
 
         background_1[background_1 > image] = image[background_1 > image]
         background_2[background_2 > image] = image[background_2 > image]
-        kernel_1 = octagon(1, 1)
+        kernel_1 = octagon(3, 3)
         image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel_1)
         background_1 = cv2.morphologyEx(background_1, cv2.MORPH_CLOSE, kernel_1)
         background_2 = cv2.morphologyEx(background_2, cv2.MORPH_CLOSE, kernel_1)

@@ -15,7 +15,7 @@ def time_this(f):
            result += (end_time - start_time,)
         else:
            result = (result, end_time - start_time)
-        print(f"Inside time this function with {result}")
+        print(f"Time inside time this function: {end_time - start_time}")
         # Time taken = end_time - start_time
         #print('| func:%r args:[%r, %r] took: %2.4f seconds |' % \
               # (f.__name__, args, kw, end_time - start_time))
@@ -78,6 +78,7 @@ def read_tile_at_z(codex_obj, cl, ch, x, y, z):
             codex_obj.metadata['roi']) + '_00' + num2str((x - 1) * codex_obj.metadata['ny'] + y) + '_Z' + num2str(
             z) + '_CH' + num2str(ch) + '.tif'
     
-    print(f"region: {codex_obj.region} Reading tile at: {path}")
+    i = cv2.imread(path, -1)
+    print(f"region: {codex_obj.region} Reading tile at: {path} size: {i.shape} dtype: {i.dtype}")
 
-    return cv2.imread(path, -1)
+    return i

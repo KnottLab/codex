@@ -8,20 +8,25 @@ import ray
 def edof_loop(codex_object, cl, ch, x, y):
 
     image_s = np.zeros((codex_object.metadata['tileWidth'], codex_object.metadata['tileWidth'],
-                        codex_object.metadata['nz']))
+                        codex_object.metadata['nz']), dtype=np.uint16)
 
     if codex_object.metadata['real_tiles'][x,y] != 'x':
         for z in range(codex_object.metadata['nz']):
-            image = read_tile_at_z(codex_object, cl, ch, x, y, z)
+            image = read_tile_at_z(codex_object, cl, ch, x, y, z).astype(np.uint16) # ??
             if image is None:
                 raise Exception("Image at above path isn't present")
             image_s[:, :, z] = image
+        print(f"calculating EDOF from stack: {image_s.shape} ({image_s.dtype})")
         image, success = calculate_focus_stack(image_s)
     else:
       image = None
       success = False
 
-    return image, success
+    image_id = ray.put(image)
+    print(f"placing EDOF image in shared mem: {image.shape} ({image.dtype}) ID: {image_id}")
+    del image
+    return image_id, success
+
 
 def calculate_focus_stack(image, processor='CPU'):
     """Turn this method into a class if more than one focus stack method is needed"""

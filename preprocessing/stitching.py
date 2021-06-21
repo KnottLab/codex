@@ -149,7 +149,7 @@ class Stitching:
         # j[x_start:x_end, y_start:y_end] += warped_image.astype('uint16') * (j[x_start:x_end, y_start:y_end] == 0).astype('uint16')
         # m[x_start:x_end, y_start:y_end] += (warped_image > 0).astype('uint8')
 
-        j[x_start:x_end, y_start:y_end] += image_subset[:dx,:dy].astype('uint16') * (j[x_start:x_end, y_start:y_end] == 0).astype('uint16')
+        j[x_start:x_end, y_start:y_end] += image_subset[:dx,:dy].astype('uint16') * (m[x_start:x_end, y_start:y_end] == 0).astype('uint16')
         m[x_start:x_end, y_start:y_end] = 1
         if mask is not None:
            mask[x_2, y_2] = 1
@@ -313,13 +313,13 @@ def get_registration_transform(x1, y1, x2, y2, image, image_width, overlap_width
         overlapping_edge_2 = 'left'
 
     print(f'registering tile2 ({x2},{y2}) to tile1 ({x1},{y1}) on the {overlapping_edge_1} edge')
-    cv2.imwrite(overlap_directory + "/" + f'overlap_tile_reference_{x1}_{y1}_{overlapping_edge_1}.tif', overlap_tile_1)
-    cv2.imwrite(overlap_directory + "/" + f'overlap_tile_original_{x1}_{y1}_{overlapping_edge_1}.tif', overlap_tile_2)
+    # cv2.imwrite(overlap_directory + "/" + f'overlap_tile_reference_{x1}_{y1}_{overlapping_edge_1}.tif', overlap_tile_1)
+    # cv2.imwrite(overlap_directory + "/" + f'overlap_tile_original_{x1}_{y1}_{overlapping_edge_1}.tif', overlap_tile_2)
 
     initial_correlation = corr2(overlap_tile_1, overlap_tile_2)
     xoff, yoff, xeoff, yeoff = chi2_shift(overlap_tile_1, overlap_tile_2, return_error=True, upsample_factor='auto')
     shifted_image = shift.shift2d(overlap_tile_2, -xoff, -yoff)
-    cv2.imwrite(overlap_directory + "/" + f'overlap_tile_shifted_{x1}_{y1}_{overlapping_edge_1}.tif', shifted_image)
+    # cv2.imwrite(overlap_directory + "/" + f'overlap_tile_shifted_{x1}_{y1}_{overlapping_edge_1}.tif', shifted_image)
 
     warped_correlation = corr2(overlap_tile_1[shifted_image > 0], shifted_image[shifted_image > 0])
 
