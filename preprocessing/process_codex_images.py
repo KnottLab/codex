@@ -86,7 +86,14 @@ class ProcessCodex:
                 print("Building remote function for : " + marker_name + \
                       " CL: " + str(cl) + " CH: " + str(ch) + " X: " + str(x) + " Y: " + str(y))
 
-                futures.append(edof_loop.remote(self.codex_object, cl, ch, x, y))
+
+                futures.append(edof_loop.remote(self.codex_object.metadata['tileWidth'], 
+                                                self.codex_object.metadata['nz'],
+                                                self.codex_object.metadata['real_tiles'],
+                                                self.codex_object.metadata['cycle_folders'],
+                                                self.codex_object.metadata['Ntiles'],
+                                                self.codex_object.region,
+                                                cl, ch, x, y))
 
 
         print("Running EDOF functions remotely")

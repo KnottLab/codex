@@ -5,26 +5,30 @@ from utilities.utility import read_tile_at_z
 import ray
 
 @ray.remote
-def edof_loop(codex_object, cl, ch, x, y):
+#def edof_loop(codex_object, cl, ch, x, y):
+def edof_loop(tileWidth, nz, real_tiles, cycle_folders, Ntiles, region, cl, ch, x, y):
 
-    image_s = np.zeros((codex_object.metadata['tileWidth'], codex_object.metadata['tileWidth'],
-                        codex_object.metadata['nz']), dtype=np.uint16)
+    # image_s = np.zeros((codex_object.metadata['tileWidth'], codex_object.metadata['tileWidth'],
+    #                     codex_object.metadata['nz']), dtype=np.uint16)
+    image_s = np.zeros((tileWidth, tileWidth, nz), dtype=np.uint16)
 
-    if codex_object.metadata['real_tiles'][x,y] != 'x':
-        for z in range(codex_object.metadata['nz']):
-            image = read_tile_at_z(codex_object, cl, ch, x, y, z).astype(np.uint16) # ??
+    if real_tiles[x,y] != 'x':
+        for z in range(nz):
+            #image = read_tile_at_z(codex_object, cl, ch, x, y, z).astype(np.uint16) # ??
+            image = read_tile_at_z(cycle_folders, Ntiles, region, real_tiles, cl, ch, x, y, z)
+
             if image is None:
                 raise Exception("Image at above path isn't present")
             image_s[:, :, z] = image
         print(f"calculating EDOF from stack: {image_s.shape} ({image_s.dtype})")
-        image, success = calculate_focus_stack(image_s)
+        edof_image, success = calculate_focus_stack(image_s)
     else:
-      image = None
+      edof_image = None
       success = False
 
-    image_id = ray.put(image)
-    print(f"placing EDOF image in shared mem: {image.shape} ({image.dtype}) ID: {image_id}")
-    del image
+    image_id = ray.put(edof_image)
+    print(f"placing EDOF image in shared mem: {edof_image.shape} ({edof_image.dtype}) ID: {image_id}")
+    del edof_image
     return image_id, success
 
 
@@ -38,7 +42,7 @@ def calculate_focus_stack(image, processor='CPU'):
     # Compute fmeasure
     f_measure = np.zeros((m, n, p))
     for focus in range(p):
-        focused_image = image[:, :, focus]
+        focused_image = image[:, :, focus].copy()
         focused_image = focused_image.astype('float') / 65535
         f_measure[:, :, focus] = calculate_gfocus(focused_image, nh_size)
 
@@ -61,7 +65,7 @@ def calculate_focus_stack(image, processor='CPU'):
         print("Cannot create fused image -- returning a middle slice")
         n_imgs = image.shape[-1]
         index_out = int(n_imgs/2)
-        image_out = image[:,:,index_out]
+        image_out = image[:,:,index_out].copy()
         return image_out, False
 
     else:
