@@ -19,16 +19,27 @@ import scipy.ndimage as ndimage
 import argparse
 
 alphabet = list('abcdefghijklmnopqrstuvwxyz1234567890')
-<<<<<<< HEAD
-=======
 
->>>>>>> fa093517447a00d8d77b7d36a167782647c869da
+
+def stack_shading_input(image, codex_object, out_path):
+    image_stack = []
+    dtype_max = np.iinfo(np.uint16).max
+    width = codex_object.metadata['tileWidth']
+    for x in range(codex_object.metadata['nx']):
+        for y in range(codex_object.metadata['ny']):
+            if codex_object.metadata['real_tiles'][x,y]=='x':
+                continue
+            image_subset = image[x * width : (x + 1) * width, y * width : (y + 1) * width].copy()
+            image_subset = image_subset / dtype_max
+
+            image_stack.append(image_subset.copy())
+    return np.dstack(image_stack)
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Codex pipeline arguments')
    
-    parser.add_argument('--data_path', metavar='Data path', type=str, required=True, help='Data path to read CODEX raw data from')
+    parser.add_argument('--data_path', metavar='Data path', type=str, required=True, help='Data path to read CODEX raw data')
     parser.add_argument('--sample_id', metavar='Sample ID', type=str, required=True, help='Sample ID for the codex data')
     parser.add_argument('--output_path', metavar='Output path', type=str, required=True, help='Output path for results')
     parser.add_argument('--xml_path', metavar='XML file path', type=str, required=True, help='Experiment XML information')
@@ -39,10 +50,18 @@ if __name__ == '__main__':
                         help='Whether to make and save intermediate stitching images for every single tile.')
     parser.add_argument('--ray_object_store_bytes', type=int, default=None,
                         help='Size of shared memory for ray processes, in bytes. '+\
-                             '~16-32GB should be more than enough. Default is to auto-set.')
+                             '~16-32GB should be more than enough. Default is to auto-set according to the ray settings.')
     parser.add_argument('--short_name', type=str, default=''.join(np.random.choice(alphabet, 5)), 
                                         help='to make the ray temp dir unique')
     parser.add_argument('--clobber', action='store_true', help='Whether to always overwrite existing output. default=False')
+    parser.add_argument('--get_shading_input', action='store_true', 
+                         help='Save the result of EDOF only and exit. '+\
+                              'This should be used to process a flatfield and darkfield image for the sample '+\
+                              'in order to apply a uniform shading correction to each tile & region.')
+    parser.add_argument('--precomputed_shading', type=str, default=None, required=False, 
+                         help='If set, use the flatfield and darkfield images at the given path '+\
+                              'instead of estimating for each region.')
+
                                                       
     args = parser.parse_args()
 
@@ -50,6 +69,7 @@ if __name__ == '__main__':
 
 
     edofdir = f'{args.output_path}/0_edof'
+    shading_input_file = f'{args.output_path}/shading_correction_input.pkl'
     shadingdir = f'{args.output_path}/1_shading_correction'
     cycledir = f'{args.output_path}/2_cycle_alignment'
     backgrounddir = f'{args.output_path}/3_background_subtract'
@@ -71,13 +91,17 @@ if __name__ == '__main__':
     os.makedirs(args.output_path, exist_ok=True)
     os.makedirs(edofdir, exist_ok=True)
     os.makedirs(shadingdir, exist_ok=True)
-    os.makedirs(cycledir, exist_ok=True)
-    os.makedirs(backgrounddir, exist_ok=True)
-    os.makedirs(stitchingdir, exist_ok=True)
-    os.makedirs(stitching_db_dir, exist_ok=True)
-    os.makedirs(finaldir, exist_ok=True)
-    os.makedirs(qcdir, exist_ok=True)
-    os.makedirs(overlap_dir, exist_ok=True)
+    if args.get_shading_input:
+        print('Requested to run up to shading correction input only. Not creating additional outputs')
+        shading_input_dict = {}
+    else:
+        os.makedirs(cycledir, exist_ok=True)
+        os.makedirs(backgrounddir, exist_ok=True)
+        os.makedirs(stitchingdir, exist_ok=True)
+        os.makedirs(stitching_db_dir, exist_ok=True)
+        os.makedirs(finaldir, exist_ok=True)
+        os.makedirs(qcdir, exist_ok=True)
+        os.makedirs(overlap_dir, exist_ok=True)
 
 
     base_path = Path(codex_object.data_path + "/" + codex_object.sample_id)
@@ -89,7 +113,6 @@ if __name__ == '__main__':
     cycle_folders = cycle_folders[1:]
     cycle_folders = [folder for folder in cycle_folders if folder.name[-1].isdigit()]
 
-    #xml_file_path = list(base_path.glob('*.xml'))
     xml_file_path = args.xml_path
     if codex_object.region == 0:
         xlif_file_path = cycle_folders[0] / 'Metadata' / 'TileScan 1.xlif'
@@ -112,11 +135,9 @@ if __name__ == '__main__':
     print("Codex metadata is: " + str(metadata_dict))
 
     codex_object.metadata = metadata_dict
-
     codex_object.cycle_alignment_info = []
     codex_object.background_1 = []
     codex_object.background_2 = []
-
     process_codex = process_codex_images.ProcessCodex(codex_object=codex_object)
     stitching_object = stitching.Stitching(codex_object)
 
@@ -176,6 +197,16 @@ if __name__ == '__main__':
             #                       Shading correction
             #
             # ===============================================================
+
+            if args.get_shading_input:
+                image_stack = stack_shading_input(image, codex_object, out_path)
+                shading_input_dict[f'cycle{cycle}_channel{channel}'] = image_stack.copy()
+                print(f'Stashed shading input data for cycle {cycle} channel {channel}. Continuing.')
+                continue
+
+            if args.precomputed_shading:
+                pass
+
             print("Shading correction reached")
             # if args.debug and (channel > 0):
             #     input("continue ")
@@ -387,3 +418,11 @@ if __name__ == '__main__':
             time_df = pd.DataFrame.from_dict(time_dict)
             time_df.to_csv(qcdir + "/time_info.csv")
 
+
+    if args.get_shading_input:
+        print(f'Saving shading input data with items:')
+        for k,v in shading_input_dict.items():
+            print(f'{k}: {v.shape}')
+
+        print(f'Saving to: {shading_input_file}')
+        pkl.dump(shading_input_dict, oepn(shading_input_file, 'w+'))
