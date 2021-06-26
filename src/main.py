@@ -19,7 +19,7 @@ from skimage.morphology import octagon
 import scipy.ndimage as ndimage
 import argparse
 
-alphabet = list('abcdefghijklmnopqrstuvwxyz')
+alphabet = list('abcdefghijklmnopqrstuvwxyz1234567890')
 
 
 if __name__ == '__main__':
@@ -35,10 +35,13 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true', help='Whether to make and save intermediate images')
     parser.add_argument('--debug_stitching', action='store_true', 
                         help='Whether to make and save intermediate stitching images for every single tile.')
-    parser.add_argument('--ray_object_store_bytes', type=int, default=int(6.4e10),
-                        help='Whether to make and save intermediate images')
+    parser.add_argument('--ray_object_store_bytes', type=int, default=None,
+                        help='Size of shared memory for ray processes, in bytes. '+\
+                             '~16-32GB should be more than enough. Default is to auto-set.')
     parser.add_argument('--short_name', type=str, default=''.join(np.random.choice(alphabet, 5)), 
                                         help='to make the ray temp dir unique')
+    parser.add_argument('--clobber', action='store_true', help='Whether to always overwrite existing output. default=False')
+                                                      
     args = parser.parse_args()
 
     codex_object = codex.Codex(data_path=args.data_path, region=args.region, sample_id=args.sample_id)
@@ -53,6 +56,15 @@ if __name__ == '__main__':
     finaldir = f'{args.output_path}/images'
     qcdir = f'{args.output_path}/qc'
     overlap_dir = f'{args.output_path}/overlapping_regions'
+
+    if os.path.isdir(finaldir) and not args.clobber:
+        print('Found existing output directory and settings indicate to be safe.')
+        print(f'output base: {args.output_path}')
+        print('Run with --clobber to overwrite existing content at this output location')
+        print('or supply a different output base with --output_path.')
+        print('Exiting.')
+        sys.exit(0)
+
 
     os.makedirs(args.output_path, exist_ok=True)
     os.makedirs(edofdir, exist_ok=True)
@@ -126,14 +138,19 @@ if __name__ == '__main__':
 
     time_dict = {'cycle': [] , 'channel': [], 'time': [], 'function': []}
 
-    input("continue ")
+    # input("continue ")
 
     for channel in range(codex_object.metadata['nch']):
         for cycle, cycle_index in zip(cycle_range, range(codex_object.metadata['ncl'])):
             print("EDOF ready")
-            if args.debug and (channel > 0):
-                input("continue ")
+            # if args.debug and (channel > 0):
+            #     input("continue ")
 
+            # ===============================================================
+            #
+            #                       EDOF
+            #
+            # ===============================================================
             image, time = process_codex.apply_edof(cycle, channel)
             time_dict['cycle'].append(cycle)
             time_dict['channel'].append(channel)
@@ -152,10 +169,17 @@ if __name__ == '__main__':
 
 
 
+            # ===============================================================
+            #
+            #                       Shading correction
+            #
+            # ===============================================================
             print("Shading correction reached")
-            if args.debug and (channel > 0):
-                input("continue ")
-            image, time = process_codex.shading_correction(image, cycle, channel)
+            # if args.debug and (channel > 0):
+            #     input("continue ")
+            if (channel==0) and (cycle==0):
+                tissue_mask = process_codex.get_tissue_mask(image)
+            image, time = process_codex.shading_correction(image, tissue_mask, cycle, channel)
             time_dict['cycle'].append(cycle)
             time_dict['channel'].append(channel)
             time_dict['time'].append(time)
@@ -171,6 +195,12 @@ if __name__ == '__main__':
                 print(f"shading correction done. Saving file. --> {shadingpath}")
                 cv2.imwrite(shadingpath, image)
 
+
+            # ===============================================================
+            #
+            #                       Cycle Alignment
+            #
+            # ===============================================================
             if channel == 0 and cycle == 0:
                 print("Reference DAPI image does not need cycle alignment. Stashing image for cycle reference.")
                 image_ref = image.copy()
@@ -201,14 +231,20 @@ if __name__ == '__main__':
 
                 print(f"cycle alignment done. Saving file. --> {cyclepath}")
                 cv2.imwrite(cyclepath, image)
-            if args.debug and (channel > 0):
-                input("continue ")
+            # if args.debug and (channel > 0):
+            #     input("continue ")
 
+
+            # ===============================================================
+            #
+            #                       Background subtraction
+            #
+            # ===============================================================
             if channel > 0:
                 if cycle == 0:
-                    codex_object.background_1.append(image)
+                    codex_object.background_1.append(image.copy())
                 elif cycle == codex_object.metadata['ncl'] - 1:
-                    codex_object.background_2.append(image)
+                    codex_object.background_2.append(image.copy())
                 else:
                     image, time = process_codex.background_subtraction(image, codex_object.background_1[channel - 1],
                                                                  codex_object.background_2[channel - 1], cycle, channel)
@@ -219,17 +255,26 @@ if __name__ == '__main__':
                                      f'cycle{cycle:02d}_'+\
                                      f'channel{channel:02d}_'+\
                                      f'{codex_object.metadata["marker_array"][cycle][channel]}.tif'
+                    if args.debug:
+                        print(f"Background subtraction done. Saving file. --> {backgroundpath}")
+                        cv2.imwrite(backgroundpath, image)
 
-                    print(f"Background subtraction done. Saving file. --> {backgroundpath}")
-                    cv2.imwrite(backgroundpath, image)
                     time_dict['cycle'].append(cycle)
                     time_dict['channel'].append(channel)
                     time_dict['time'].append(time)
                     time_dict['function'].append('Background subtraction')
+
+
+            # ===============================================================
+            #
+            #                       Stitching
+            #
+            # ===============================================================
             print("Stitching started")
             if channel == 0 and cycle == 0:
                 image_shared_stitch = ray.put(image)
-                stitching_dict, time_init = stitching_object.init_stitching(image_shared_stitch, image_width=codex_object.metadata['tileWidth'],
+                stitching_dict, time_init = stitching_object.init_stitching(image_shared_stitch, 
+                                                image_width=codex_object.metadata['tileWidth'],
                                                 overlap_width=codex_object.metadata['width'], overlap_directory=overlap_dir)
                 first_tile, time_find = stitching_object.find_first_tile() 
                 j, m, mask, time_first = stitching_object.stitch_first_tile(first_tile, image,
@@ -245,7 +290,8 @@ if __name__ == '__main__':
                     tile_2.x_off = registration.get('xoff') + tile_1.x_off
                     tile_2.y_off = registration.get('yoff') + tile_1.y_off
                     tile_2.stitching_index = k
-                    j, m, mask, jdebug_fixed, jdebug_naive, time_tiles = stitching_object.stitch_tiles(image, codex_object.metadata['tileWidth'], 
+                    j, m, mask, jdebug_fixed, jdebug_naive, time_tiles = stitching_object.stitch_tiles(image, 
+                                                               codex_object.metadata['tileWidth'], 
                                                                codex_object.metadata['width'], j, m, mask, tile_2,
                                                                tile_2.x_off, tile_2.y_off, debug=args.debug)
                     time_stitch += time_pairs + time_tiles
@@ -309,15 +355,14 @@ if __name__ == '__main__':
                 time_dict['function'].append('Stitching')
 
             if args.debug:
-              stitchingpath = f'{stitchingdir}/'+\
-                              f'{args.sample_id}_'+\
-                              f'reg{args.region:02d}_'+\
-                              f'cycle{cycle:02d}_'+\
-                              f'channel{channel:02d}_'+\
-                              f'{codex_object.metadata["marker_array"][cycle][channel]}.tif'
-
-              print(f"Stitching done. Saving file. --> {stitchingpath}")
-              cv2.imwrite(stitchingpath, j)
+                stitchingpath = f'{stitchingdir}/'+\
+                                f'{args.sample_id}_'+\
+                                f'reg{args.region:02d}_'+\
+                                f'cycle{cycle:02d}_'+\
+                                f'channel{channel:02d}_'+\
+                                f'{codex_object.metadata["marker_array"][cycle][channel]}.tif'
+                print(f"Stitching done. Saving file. --> {stitchingpath}")
+                cv2.imwrite(stitchingpath, j)
 
             final_image_path = f'{finaldir}/'+\
                                f'{args.sample_id}_'+\
@@ -326,6 +371,11 @@ if __name__ == '__main__':
                                f'channel{channel:02d}_'+\
                                f'{codex_object.metadata["marker_array"][cycle][channel]}.tif'
 
+            # ===============================================================
+            #
+            #                       Finished; save
+            #
+            # ===============================================================
             print(f"Channel done. Saving file. --> {final_image_path}")
             cv2.imwrite(final_image_path, j)
 

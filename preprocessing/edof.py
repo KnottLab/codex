@@ -3,25 +3,30 @@ import numpy as np
 import scipy.ndimage as ndimage
 from utilities.utility import read_tile_at_z
 import ray
+#from pybasic import basic
+
+#coef = np.iinfo(np.uint16).max
 
 @ray.remote
-#def edof_loop(codex_object, cl, ch, x, y):
 def edof_loop(tileWidth, nz, real_tiles, cycle_folders, Ntiles, region, cl, ch, x, y):
 
-    # image_s = np.zeros((codex_object.metadata['tileWidth'], codex_object.metadata['tileWidth'],
-    #                     codex_object.metadata['nz']), dtype=np.uint16)
     image_s = np.zeros((tileWidth, tileWidth, nz), dtype=np.uint16)
 
     if real_tiles[x,y] != 'x':
         for z in range(nz):
-            #image = read_tile_at_z(codex_object, cl, ch, x, y, z).astype(np.uint16) # ??
             image = read_tile_at_z(cycle_folders, Ntiles, region, real_tiles, cl, ch, x, y, z)
 
             if image is None:
                 raise Exception("Image at above path isn't present")
             image_s[:, :, z] = image
+
         print(f"calculating EDOF from stack: {image_s.shape} ({image_s.dtype})")
         edof_image, success = calculate_focus_stack(image_s)
+
+        # flatfield, darkfield = basic(images=image_s/coef, segmentation=None, _working_size=256)#, _lambda_s=1, _lambda_darkfield=1)
+        # print(f"applying shading correction: {edof_image.shape} {flatfield.shape} {darkfield.shape}")
+        # edof_image = (((edof_image/coef - darkfield) / flatfield) * coef).astype(np.uint16)
+
     else:
       edof_image = None
       success = False

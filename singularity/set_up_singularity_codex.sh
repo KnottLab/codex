@@ -3,13 +3,14 @@
 # write this as if we're inside a singularity image
 
 source /miniconda3/bin/activate codex
-which python
+echo "Setting up singularity image to run codex assembly"
+which python3
 python --version
 which pip3
 
 pip3 install --no-cache-dir pytest
 
-pybasic_path=/common/shaha4/shaha4/codex/pybasic 
+pybasic_path=/home/ingn/devel/pybasic 
 codex_path=/home/ingn/devel/codex
 
 echo "temp dir:"

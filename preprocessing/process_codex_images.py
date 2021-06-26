@@ -5,6 +5,7 @@ from .edof import edof_loop
 from image_registration import chi2_shift
 from image_registration.fft_tools import shift
 from skimage.morphology import octagon
+from skimage.filters import threshold_otsu
 import cv2
 import ray
 from pybasic import basic
@@ -55,6 +56,10 @@ class ProcessCodex:
 
     def __init__(self, codex_object):
         self.codex_object = codex_object
+
+        self.kernel_1 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (50,50))
+        self.kernel_2 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (20,20))
+
 
     @time_this
     def apply_edof(self, cl, ch, processor='CPU'):
@@ -157,22 +162,33 @@ class ProcessCodex:
             image: Image with background subtracted
         """
         print("Background subtraction started for cycle {0} and channel {1}".format(cycle, channel))
+        bg1 = background_1.copy()
+        bg2 = background_2.copy()
 
-        background_1[background_1 > image] = image[background_1 > image]
-        background_2[background_2 > image] = image[background_2 > image]
-        kernel_1 = octagon(3, 3)
-        image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel_1)
-        background_1 = cv2.morphologyEx(background_1, cv2.MORPH_CLOSE, kernel_1)
-        background_2 = cv2.morphologyEx(background_2, cv2.MORPH_CLOSE, kernel_1)
-        kernel_2 = octagon(5, 2)
-        image = cv2.morphologyEx(image, cv2.MORPH_TOPHAT, kernel_2)
-        background_1 = cv2.morphologyEx(background_1, cv2.MORPH_TOPHAT, kernel_2)
-        background_2 = cv2.morphologyEx(background_2, cv2.MORPH_TOPHAT, kernel_2)
+        ## Median filter version
+        image = cv2.medianBlur(image, 5)
+        bg1 = cv2.medianBlur(bg1, 5)
+        bg2 = cv2.medianBlur(bg2, 5)
+
+        # ## Morphology version
+        # background_1[background_1 > image] = image[background_1 > image]
+        # background_2[background_2 > image] = image[background_2 > image]
+        # kernel_1 = octagon(1, 1)
+        # image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel_1)
+        # background_1 = cv2.morphologyEx(background_1, cv2.MORPH_CLOSE, kernel_1)
+        # background_2 = cv2.morphologyEx(background_2, cv2.MORPH_CLOSE, kernel_1)
+        # kernel_2 = octagon(5, 2)
+        # image = cv2.morphologyEx(image, cv2.MORPH_TOPHAT, kernel_2)
+        # background_1 = cv2.morphologyEx(background_1, cv2.MORPH_TOPHAT, kernel_2)
+        # background_2 = cv2.morphologyEx(background_2, cv2.MORPH_TOPHAT, kernel_2)
+
         a = (self.codex_object.metadata['ncl'] - cycle - 1) / (self.codex_object.metadata['ncl'] - 3)
         b = 1 - a
-        image = image - a * background_1 - b * background_2
+        image = image - a * bg1 - b * bg2
+        image[image<0] = 0
         image = image + 1
-        image[np.logical_not(np.logical_and(np.logical_and(image > 0, background_1 > 0), background_2 > 0))] = 0
+        image[np.logical_not(np.logical_and(np.logical_and(image > 0, bg1 > 0), bg2 > 0))] = 0
+
 
         return image.astype(np.uint16)
 
@@ -232,6 +248,8 @@ class ProcessCodex:
 
         return cycle_alignment_info
 
+
+
     @time_this
     def cycle_alignment_apply_transform(self, image_ref, image, cycle_alignment_info, cycle, channel, cycle_alignment_dict):
         """ Get and stash a cycle alignment transformation
@@ -288,28 +306,67 @@ class ProcessCodex:
 
         return image, cycle_alignment_dict
 
+    # @time_this
+    # def shading_correction(self, image, tissue, cycle, channel):
+    #     return image
+
     @time_this
-    def shading_correction(self, image, cycle, channel):
+    def shading_correction(self, image, tissue, cycle, channel):
         image_list = []
+        tissue_list = []
+        dtype_max = np.iinfo(np.uint16).max
+        # factor = np.max(image) / dtype_max
         print("Shading correction started for cycle {} and channel {}".format(cycle, channel))
         width = self.codex_object.metadata['tileWidth']
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
                 if self.codex_object.metadata['real_tiles'][x,y]=='x':
                     continue
-                image_subset = image[x * width : (x + 1) * width, y * width : (y + 1) * width]
-                image_list.append(image_subset)
+                image_subset = image[x * width : (x + 1) * width, y * width : (y + 1) * width].copy()
+                image_subset = image_subset / dtype_max
+                image_list.append(image_subset.copy())
 
-        image_array = np.dstack(image_list)
+                tissue_subset = tissue[x * width : (x + 1) * width, y * width : (y + 1) * width].copy()
+                tissue_subset = cv2.resize(tissue_subset, dsize=(256,256), interpolation=cv2.INTER_NEAREST)
+                tissue_list.append(tissue_subset==0)
+
+        image_array = np.dstack(image_list)#.astype(np.float32) / factor / dtype_max
+        #tissue_array = np.dstack(tissue_list)
         print("Image array has shape {}".format(image_array.shape))
-        flatfield, darkfield = basic(images=image_array, segmentation=None)
-        print("Flatfield has shape {} and darkfield has shape {}".format(flatfield.shape, darkfield.shape))
+        #print("Tissue array has shape {}".format(tissue_array.shape))
+        flatfield, darkfield = basic(images=image_array, segmentation=None, _working_size=256)#, _lambda_s=1, _lambda_darkfield=1)
+
+        #print("Flatfield has shape {} and darkfield has shape {}".format(flatfield.shape, darkfield.shape))
         for x in range(self.codex_object.metadata['nx']):
             for y in range(self.codex_object.metadata['ny']):
-                image_subset = image[x * width:(x + 1) * width, y * width: (y + 1) * width]
-                image[x * width: (x+1) * width, y * width : (y+1) * width] = ((image_subset.astype('double') - darkfield) / flatfield).astype('uint16')
+                if self.codex_object.metadata['real_tiles'][x,y]=='x':
+                    continue
+                image_subset = image[x * width:(x + 1) * width, y * width: (y + 1) * width].copy()
+                #image[x * width: (x+1) * width, y * width : (y+1) * width] = ((image_subset.astype('double') - darkfield) / flatfield).astype('uint16')
+                image_subset = image_subset / dtype_max
+                image_corrected = (image_subset - darkfield) / flatfield
+                image_corrected[image_corrected<0] = 0
+                #image[x * width: (x+1) * width, y * width : (y+1) * width] = (image_corrected*dtype_max*factor).astype('uint16')
+                image[x * width: (x+1) * width, y * width : (y+1) * width] = (image_corrected*dtype_max).astype('uint16')
 
         return image + 1
+
+
+    def get_tissue_mask(self, image):
+        r,c = image.shape
+
+        I = cv2.resize(image, dsize=(0,0), fx=0.25, fy=0.25)
+        s = np.quantile(I, 0.7)
+        I[I > s] = s
+
+        tissue = cv2.morphologyEx(I, cv2.MORPH_CLOSE, self.kernel_1)
+        thr = threshold_otsu(tissue.ravel())
+        tissue = (tissue > thr).astype(np.uint8)
+        tissue = cv2.morphologyEx(tissue, cv2.MORPH_OPEN, self.kernel_2)
+        tissue = cv2.resize(tissue, dsize=(c,r), interpolation=cv2.INTER_NEAREST)
+
+        return tissue
+        
 
 
 @ray.remote
