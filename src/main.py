@@ -21,7 +21,7 @@ import argparse
 alphabet = list('abcdefghijklmnopqrstuvwxyz1234567890')
 
 
-def stack_shading_input(image, codex_object, out_path):
+def stack_shading_input(image, codex_object):
     image_stack = []
     dtype_max = np.iinfo(np.uint16).max
     width = codex_object.metadata['tileWidth']
@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
 
     edofdir = f'{args.output_path}/0_edof'
-    shading_input_file = f'{args.output_path}/shading_correction_input.pkl'
+    shading_input_dir = f'{args.output_path}/1a_shading_correction_input'
     shadingdir = f'{args.output_path}/1_shading_correction'
     cycledir = f'{args.output_path}/2_cycle_alignment'
     backgrounddir = f'{args.output_path}/3_background_subtract'
@@ -92,8 +92,8 @@ if __name__ == '__main__':
     os.makedirs(edofdir, exist_ok=True)
     os.makedirs(shadingdir, exist_ok=True)
     if args.get_shading_input:
+        os.makedirs(shading_input_dir, exist_ok=True)
         print('Requested to run up to shading correction input only. Not creating additional outputs')
-        shading_input_dict = {}
     else:
         os.makedirs(cycledir, exist_ok=True)
         os.makedirs(backgrounddir, exist_ok=True)
@@ -163,6 +163,10 @@ if __name__ == '__main__':
 
     # input("continue ")
 
+    if args.precomputed_shading is not None:
+        shading_estimates = pkl.load(open(args.precomputed_shading, 'rb'))
+        
+
     for channel in range(codex_object.metadata['nch']):
         for cycle, cycle_index in zip(cycle_range, range(codex_object.metadata['ncl'])):
             print("EDOF ready")
@@ -199,20 +203,27 @@ if __name__ == '__main__':
             # ===============================================================
 
             if args.get_shading_input:
-                image_stack = stack_shading_input(image, codex_object, out_path)
-                shading_input_dict[f'cycle{cycle}_channel{channel}'] = image_stack.copy()
+                image_stack = stack_shading_input(image, codex_object)
+                shading_input_file = f'{shading_input_dir}/cycle{cycle}_channel{channel}.npz'
+                np.savez(shading_input_file, image_stack=image_stack)
                 print(f'Stashed shading input data for cycle {cycle} channel {channel}. Continuing.')
                 continue
 
+
             if args.precomputed_shading:
-                pass
+                flatfield = shading_estimates['flatfield'][f'cycle{cycle}_channel{channel}']
+                darkfield = shading_estimates['darkfield'][f'cycle{cycle}_channel{channel}']
+            else:
+                flatfield, darkfield = None, None
+
 
             print("Shading correction reached")
-            # if args.debug and (channel > 0):
-            #     input("continue ")
             if (channel==0) and (cycle==0):
                 tissue_mask = process_codex.get_tissue_mask(image)
-            image, time = process_codex.shading_correction(image, tissue_mask, cycle, channel)
+
+            image, time = process_codex.shading_correction(image, tissue_mask, cycle, channel, 
+                                                           flatfield=flatfield,
+                                                           darkfield=darkfield)
             time_dict['cycle'].append(cycle)
             time_dict['channel'].append(channel)
             time_dict['time'].append(time)
@@ -419,10 +430,10 @@ if __name__ == '__main__':
             time_df.to_csv(qcdir + "/time_info.csv")
 
 
-    if args.get_shading_input:
-        print(f'Saving shading input data with items:')
-        for k,v in shading_input_dict.items():
-            print(f'{k}: {v.shape}')
+    # if args.get_shading_input:
+    #     print(f'Saving shading input data with items:')
+    #     for k,v in shading_input_dict.items():
+    #         print(f'{k}: {v.shape}')
 
-        print(f'Saving to: {shading_input_file}')
-        pkl.dump(shading_input_dict, oepn(shading_input_file, 'w+'))
+    #     print(f'Saving to: {shading_input_file}')
+    #     pkl.dump(shading_input_dict, oepn(shading_input_file, 'w+'))

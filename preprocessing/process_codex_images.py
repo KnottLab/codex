@@ -311,30 +311,30 @@ class ProcessCodex:
     #     return image
 
     @time_this
-    def shading_correction(self, image, tissue, cycle, channel):
-        image_list = []
-        tissue_list = []
-        dtype_max = np.iinfo(np.uint16).max
-        # factor = np.max(image) / dtype_max
-        print("Shading correction started for cycle {} and channel {}".format(cycle, channel))
+    def shading_correction(self, image, tissue, cycle, channel, flatfield=None, darkfield=None):
         width = self.codex_object.metadata['tileWidth']
-        for x in range(self.codex_object.metadata['nx']):
-            for y in range(self.codex_object.metadata['ny']):
-                if self.codex_object.metadata['real_tiles'][x,y]=='x':
-                    continue
-                image_subset = image[x * width : (x + 1) * width, y * width : (y + 1) * width].copy()
-                image_subset = image_subset / dtype_max
-                image_list.append(image_subset.copy())
+        dtype_max = np.iinfo(np.uint16).max
+        if flatfield is None:
+            image_list = []
+            tissue_list = []
+            print("Shading correction started for cycle {} and channel {}".format(cycle, channel))
+            for x in range(self.codex_object.metadata['nx']):
+                for y in range(self.codex_object.metadata['ny']):
+                    if self.codex_object.metadata['real_tiles'][x,y]=='x':
+                        continue
+                    image_subset = image[x * width : (x + 1) * width, y * width : (y + 1) * width].copy()
+                    image_subset = image_subset / dtype_max
+                    image_list.append(image_subset.copy())
 
-                tissue_subset = tissue[x * width : (x + 1) * width, y * width : (y + 1) * width].copy()
-                tissue_subset = cv2.resize(tissue_subset, dsize=(256,256), interpolation=cv2.INTER_NEAREST)
-                tissue_list.append(tissue_subset==0)
+                    tissue_subset = tissue[x * width : (x + 1) * width, y * width : (y + 1) * width].copy()
+                    tissue_subset = cv2.resize(tissue_subset, dsize=(256,256), interpolation=cv2.INTER_NEAREST)
+                    tissue_list.append(tissue_subset==0)
 
-        image_array = np.dstack(image_list)#.astype(np.float32) / factor / dtype_max
-        #tissue_array = np.dstack(tissue_list)
-        print("Image array has shape {}".format(image_array.shape))
-        #print("Tissue array has shape {}".format(tissue_array.shape))
-        flatfield, darkfield = basic(images=image_array, segmentation=None, _working_size=256)#, _lambda_s=1, _lambda_darkfield=1)
+            image_array = np.dstack(image_list)#.astype(np.float32) / factor / dtype_max
+            print("Image array has shape {}".format(image_array.shape))
+            flatfield, darkfield = basic(images=image_array, segmentation=None, _working_size=256)#, _lambda_s=1, _lambda_darkfield=1)
+        else:
+            print("Shading correction using precomputed flatfield and darkfield images")
 
         #print("Flatfield has shape {} and darkfield has shape {}".format(flatfield.shape, darkfield.shape))
         for x in range(self.codex_object.metadata['nx']):
@@ -342,11 +342,9 @@ class ProcessCodex:
                 if self.codex_object.metadata['real_tiles'][x,y]=='x':
                     continue
                 image_subset = image[x * width:(x + 1) * width, y * width: (y + 1) * width].copy()
-                #image[x * width: (x+1) * width, y * width : (y+1) * width] = ((image_subset.astype('double') - darkfield) / flatfield).astype('uint16')
                 image_subset = image_subset / dtype_max
                 image_corrected = (image_subset - darkfield) / flatfield
                 image_corrected[image_corrected<0] = 0
-                #image[x * width: (x+1) * width, y * width : (y+1) * width] = (image_corrected*dtype_max*factor).astype('uint16')
                 image[x * width: (x+1) * width, y * width : (y+1) * width] = (image_corrected*dtype_max).astype('uint16')
 
         return image + 1
