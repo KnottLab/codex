@@ -21,6 +21,15 @@ import argparse
 alphabet = list('abcdefghijklmnopqrstuvwxyz1234567890')
 
 
+def img2uint8(img):
+    s = np.quantile(img.ravel(), 0.999)
+    img_uint = img.copy().astype(np.float16)
+    img_uint[img_uint > s] = s
+    img_uint = img_uint / s
+    img_uint = (img_uint * 255).astype(np.uint8) # convert to uint8 does rounding for us
+    return img_uint
+
+
 def stack_shading_input(image, codex_object):
     image_stack = []
     dtype_max = np.iinfo(np.uint16).max
@@ -78,6 +87,7 @@ if __name__ == '__main__':
     finaldir = f'{args.output_path}/images'
     qcdir = f'{args.output_path}/qc'
     overlap_dir = f'{args.output_path}/overlapping_regions'
+    uint8_dir = f'{args.output_path}/images_uint8'
 
     if os.path.isdir(finaldir) and not args.clobber:
         print('Found existing output directory and settings indicate to be safe.')
@@ -102,6 +112,7 @@ if __name__ == '__main__':
         os.makedirs(finaldir, exist_ok=True)
         os.makedirs(qcdir, exist_ok=True)
         os.makedirs(overlap_dir, exist_ok=True)
+        os.makedirs(uint8_dir, exist_ok=True)
 
 
     base_path = Path(codex_object.data_path + "/" + codex_object.sample_id)
@@ -408,6 +419,11 @@ if __name__ == '__main__':
                 print(f"Stitching done. Saving file. --> {stitchingpath}")
                 cv2.imwrite(stitchingpath, j)
 
+            # ===============================================================
+            #
+            #                       Finished; save
+            #
+            # ===============================================================
             final_image_path = f'{finaldir}/'+\
                                f'{args.sample_id}_'+\
                                f'reg{args.region:02d}_'+\
@@ -415,13 +431,20 @@ if __name__ == '__main__':
                                f'channel{channel:02d}_'+\
                                f'{codex_object.metadata["marker_array"][cycle][channel]}.tif'
 
-            # ===============================================================
-            #
-            #                       Finished; save
-            #
-            # ===============================================================
             print(f"Channel done. Saving file. --> {final_image_path}")
             cv2.imwrite(final_image_path, j)
+
+
+            uint8_image_path = f'{uint8_dir}/'+\
+                               f'{args.sample_id}_'+\
+                               f'reg{args.region:02d}_'+\
+                               f'cycle{cycle:02d}_'+\
+                               f'channel{channel:02d}_'+\
+                               f'{codex_object.metadata["marker_array"][cycle][channel]}.png'
+
+            print(f"Channel done. Saving uint8 image. --> {uint8_image_path}")
+            cv2.imwrite(uint8_image_path, img2uint8(j))
+
 
             print(f"Saving cycle alignment file at ---> {qcdir}")
             cycle_alignment_df = pd.DataFrame.from_dict(cycle_alignment_dict)

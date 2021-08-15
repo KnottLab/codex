@@ -166,7 +166,7 @@ class ProcessCodex:
         bg2 = background_2.copy()
 
         ## Median filter version
-        image = cv2.medianBlur(image, 5)
+        #image = cv2.medianBlur(image, 5)
         bg1 = cv2.medianBlur(bg1, 5)
         bg2 = cv2.medianBlur(bg2, 5)
 
