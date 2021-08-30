@@ -123,7 +123,7 @@ if __name__ == '__main__':
     parser.add_argument('--precomputed_shading', type=str, default=None, required=False, 
                                 help='If set, use the flatfield and darkfield images at the given path '+\
                                 'instead of estimating for each region.')
-    parser.add_argument('--directory_structure', type=int, default='leica_1', required=False, choices=['lecia_1', 'leica_2'],
+    parser.add_argument('--directory_structure', type=str, default='leica_1', required=False, choices=['leica_1', 'leica_2'],
                                 help='Switch to indicate what directory structure should be assumed to correctly '+\
                                 'read metadata/image data from disk. Choices are: [leica_1, leica_2]')
 
@@ -198,7 +198,7 @@ if __name__ == '__main__':
     if args.directory_structure == 'leica_1':
         cycle_folders, xml_content, xlif_content = parse_leica_1(base_path, args.xml_path, args.region)
 
-    elif args.directory_structure == 'leica_1':
+    elif args.directory_structure == 'leica_2':
         cycle_folders, xml_content, xlif_content = parse_leica_2(base_path, args.xml_path, args.region)
 
 
