@@ -1,20 +1,23 @@
 import cv2
 import numpy as np
 import scipy.ndimage as ndimage
-from utilities.utility import read_tile_at_z
+from utilities.utility import (read_tile_at_z_leica_1, read_tile_at_z_leica_2)
 import ray
 #from pybasic import basic
 
 #coef = np.iinfo(np.uint16).max
 
 @ray.remote
-def edof_loop(tileWidth, nz, real_tiles, cycle_folders, Ntiles, region, cl, ch, x, y):
+def edof_loop(tileWidth, nz, real_tiles, cycle_folders, Ntiles, region, directory_structure, cl, ch, x, y):
 
     image_s = np.zeros((tileWidth, tileWidth, nz), dtype=np.uint16)
 
     if real_tiles[x,y] != 'x':
         for z in range(nz):
-            image = read_tile_at_z(cycle_folders, Ntiles, region, real_tiles, cl, ch, x, y, z)
+            if directory_structure == 'leica_1':
+                image = read_tile_at_z_leica_1(cycle_folders, Ntiles, region, real_tiles, cl, ch, x, y, z)
+            elif directory_structure == 'leica_2':
+                image = read_tile_at_z_leica_2(cycle_folders, Ntiles, region, real_tiles, cl, ch, x, y, z)
 
             if image is None:
                 raise Exception("Image at above path isn't present")

@@ -98,6 +98,7 @@ class ProcessCodex:
                                                 self.codex_object.metadata['cycle_folders'],
                                                 self.codex_object.metadata['Ntiles'],
                                                 self.codex_object.region,
+                                                self.codex_object.metadata['directory_structure'],
                                                 cl, ch, x, y))
 
 

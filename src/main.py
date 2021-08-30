@@ -44,32 +44,88 @@ def stack_shading_input(image, codex_object):
             image_stack.append(image_subset.copy())
     return np.dstack(image_stack)
 
+
+def parse_leica_1(base_path, xml_file_path, region):
+    cycle_folders = sorted([folder for folder in base_path.iterdir() if folder.is_dir()])
+    print("")
+    # cycle folders also end in a number
+    cycle_folders = cycle_folders[1:]
+    cycle_folders = [folder for folder in cycle_folders if folder.name[-1].isdigit()]
+
+    xml_file_path = args.xml_path
+    if region == 0:
+        xlif_file_path = cycle_folders[0] / 'Metadata' / 'TileScan 1.xlif'
+    else:
+        xlif_file_path = cycle_folders[0] / 'TileScan 1' / 'Metadata' / f'Region {region}.xlif'
+        if not xlif_file_path.exists():
+            xlif_file_path = cycle_folders[0] / 'TileScan 1' / 'Metadata' / f'Position {region}.xlif'
+
+    print("Leica DIR structure 1: XLIF file path is: " + str(xlif_file_path))
+    print("Leica DIR structure 1: XML file path is: " + str(xml_file_path))
+
+    with open(xml_file_path, 'r') as f, open(xlif_file_path, 'r') as g:
+        xml_content = f.read()
+        xlif_content = g.read()
+
+    return cycle_folders, xml_content, xlif_content
+
+
+def parse_leica_2(base_path, xml_file_path, region):
+    container_folder = sorted([folder for folder in base_path.iterdir() if folder.is_dir()])[0]
+    print(f'Leica DIR structure 2: container folder: {container_folder}')
+
+    cycle_folders = sorted([folder for folder in container_folder.iterdir() if folder.is_dir() and 'TileScan' in folder.name])
+    xlif_file_path = cycle_folders[0] / 'Metadata' / f'Region {region}.xlif'
+    
+    print("Leica DIR structure 2: XLIF file path is: " + str(xlif_file_path))
+    print("Leica DIR structure 2: XML file path is: " + str(xml_file_path))
+
+    with open(xml_file_path, 'r') as f, open(xlif_file_path, 'r') as g:
+        xml_content = f.read()
+        xlif_content = g.read()
+
+    return cycle_folders, xml_content, xlif_content
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Codex pipeline arguments')
    
-    parser.add_argument('--data_path', metavar='Data path', type=str, required=True, help='Data path to read CODEX raw data')
-    parser.add_argument('--sample_id', metavar='Sample ID', type=str, required=True, help='Sample ID for the codex data')
-    parser.add_argument('--output_path', metavar='Output path', type=str, required=True, help='Output path for results')
-    parser.add_argument('--xml_path', metavar='XML file path', type=str, required=True, help='Experiment XML information')
-    parser.add_argument('--region', type=int, required=True, help='Region number from the multiple regions to scan from')
-    parser.add_argument('-j', type=int, default=1, required=False, help='Number of CPUs to use')
-    parser.add_argument('--debug', action='store_true', help='Whether to make and save intermediate images')
+    parser.add_argument('--data_path', metavar='Data path', type=str, required=True, 
+                                help='Data path to read CODEX raw data')
+    parser.add_argument('--sample_id', metavar='Sample ID', type=str, required=True, 
+                                help='Sample ID for the codex data')
+    parser.add_argument('--output_path', metavar='Output path', type=str, required=True, 
+                                help='Output path for results')
+    parser.add_argument('--xml_path', metavar='XML file path', type=str, required=True, 
+                                help='Experiment XML information')
+    parser.add_argument('--region', type=int, required=True, 
+                                help='Region number from the multiple regions to scan from')
+    parser.add_argument('-j', type=int, default=1, required=False, 
+                                help='Number of CPUs to use')
+    parser.add_argument('--debug', action='store_true', 
+                                help='Whether to make and save intermediate images')
     parser.add_argument('--debug_stitching', action='store_true', 
-                        help='Whether to make and save intermediate stitching images for every single tile.')
+                                help='Whether to make and save intermediate stitching images for every single tile.')
     parser.add_argument('--ray_object_store_bytes', type=int, default=None,
-                        help='Size of shared memory for ray processes, in bytes. '+\
-                             '~16-32GB should be more than enough. Default is to auto-set according to the ray settings.')
+                                help='Size of shared memory for ray processes, in bytes. '+\
+                                '~16-32GB should be more than enough. Default is to auto-set according to the ray settings.')
     parser.add_argument('--short_name', type=str, default=''.join(np.random.choice(alphabet, 5)), 
-                                        help='to make the ray temp dir unique')
-    parser.add_argument('--clobber', action='store_true', help='Whether to always overwrite existing output. default=False')
+                                help='to make the ray temp dir unique')
+    parser.add_argument('--ray_temp', type=str, default='/tmp', 
+                                help='base path for temporary storage. Used by ray in case the alotted object store size is exceeded.')
+    parser.add_argument('--clobber', action='store_true', 
+                                help='Whether to always overwrite existing output. default=False')
     parser.add_argument('--get_shading_input', action='store_true', 
-                         help='Save the result of EDOF only and exit. '+\
-                              'This should be used to process a flatfield and darkfield image for the sample '+\
-                              'in order to apply a uniform shading correction to each tile & region.')
+                                help='Save the result of EDOF only and exit. '+\
+                                'This should be used to process a flatfield and darkfield image for the sample '+\
+                                'in order to apply a uniform shading correction to each tile & region.')
     parser.add_argument('--precomputed_shading', type=str, default=None, required=False, 
-                         help='If set, use the flatfield and darkfield images at the given path '+\
-                              'instead of estimating for each region.')
+                                help='If set, use the flatfield and darkfield images at the given path '+\
+                                'instead of estimating for each region.')
+    parser.add_argument('--directory_structure', type=int, default='leica_1', required=False, choices=['lecia_1', 'leica_2'],
+                                help='Switch to indicate what directory structure should be assumed to correctly '+\
+                                'read metadata/image data from disk. Choices are: [leica_1, leica_2]')
 
                                                       
     args = parser.parse_args()
@@ -118,30 +174,37 @@ if __name__ == '__main__':
     base_path = Path(codex_object.data_path + "/" + codex_object.sample_id)
     print("Base path is: " + str(base_path))
 
-    cycle_folders = sorted([folder for folder in base_path.iterdir() if folder.is_dir()])
-    print("")
-    # cycle folders also end in a number
-    cycle_folders = cycle_folders[1:]
-    cycle_folders = [folder for folder in cycle_folders if folder.name[-1].isdigit()]
+    # cycle_folders = sorted([folder for folder in base_path.iterdir() if folder.is_dir()])
+    # print("")
+    # # cycle folders also end in a number
+    # cycle_folders = cycle_folders[1:]
+    # cycle_folders = [folder for folder in cycle_folders if folder.name[-1].isdigit()]
 
-    xml_file_path = args.xml_path
-    if codex_object.region == 0:
-        xlif_file_path = cycle_folders[0] / 'Metadata' / 'TileScan 1.xlif'
-    else:
-        xlif_file_path = cycle_folders[0] / 'TileScan 1' / 'Metadata' / f'Region {codex_object.region}.xlif'
-        if not xlif_file_path.exists():
-            xlif_file_path = cycle_folders[0] / 'TileScan 1' / 'Metadata' / f'Position {codex_object.region}.xlif'
+    # xml_file_path = args.xml_path
+    # if codex_object.region == 0:
+    #     xlif_file_path = cycle_folders[0] / 'Metadata' / 'TileScan 1.xlif'
+    # else:
+    #     xlif_file_path = cycle_folders[0] / 'TileScan 1' / 'Metadata' / f'Region {codex_object.region}.xlif'
+    #     if not xlif_file_path.exists():
+    #         xlif_file_path = cycle_folders[0] / 'TileScan 1' / 'Metadata' / f'Position {codex_object.region}.xlif'
 
-    print("XLIF file path is: " + str(xlif_file_path))
-    print("XML file path is: " + str(xml_file_path))
+    # print("XLIF file path is: " + str(xlif_file_path))
+    # print("XML file path is: " + str(xml_file_path))
 
-    with open(xml_file_path, 'r') as f, open(xlif_file_path, 'r') as g:
-        xml_content = f.read()
-        xlif_content = g.read()
+    # with open(xml_file_path, 'r') as f, open(xlif_file_path, 'r') as g:
+    #     xml_content = f.read()
+    #     xlif_content = g.read()
+
+    if args.directory_structure == 'leica_1':
+        cycle_folders, xml_content, xlif_content = parse_leica_1(base_path, args.xml_path, args.region)
+
+    elif args.directory_structure == 'leica_1':
+        cycle_folders, xml_content, xlif_content = parse_leica_2(base_path, args.xml_path, args.region)
+
 
     codex_metadata = metadata.Metadata(file_content=[xml_content, xlif_content], decoder=xml_decoder.XMLDecoder())
-
     metadata_dict = codex_metadata.decode_metadata(cycle_folders=cycle_folders)
+    metadata_dict['directory_structure'] = args.directory_structure
 
     print("Codex metadata is: " + str(metadata_dict))
 
@@ -159,7 +222,7 @@ if __name__ == '__main__':
     print("Cycle range is: " + str(cycle_range))
 
     print("Setting up Ray")
-    ray.init(num_cpus=args.j, logging_level="ERROR", _temp_dir=f"/scratch/ingn/tmp/ray_{args.short_name}",
+    ray.init(num_cpus=args.j, logging_level="ERROR", _temp_dir=f"{args.ray_temp}/ray_{args.short_name}",
              object_store_memory=args.ray_object_store_bytes)
 
     cv2.setNumThreads(0)
@@ -171,8 +234,6 @@ if __name__ == '__main__':
                             'final_correlation': []}
 
     time_dict = {'cycle': [] , 'channel': [], 'time': [], 'function': []}
-
-    # input("continue ")
 
     if args.precomputed_shading is not None:
         shading_estimates = pkl.load(open(args.precomputed_shading, 'rb'))

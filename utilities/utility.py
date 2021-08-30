@@ -83,7 +83,7 @@ def num2str(x, version='1'):
 # 
 #     return i
 
-def read_tile_at_z(cycle_folders, Ntiles, region, real_tiles, cl, ch, x, y, z):
+def read_tile_at_z_leica_1(cycle_folders, Ntiles, region, real_tiles, cl, ch, x, y, z):
     #print(f'n tiles: {codex_obj.metadatta["Ntiles"]}\tregion: {codex_obj.region}')
     if cycle_folders:
         # Areas consisting of a single tile are called 'Position' instead of 'Region'
@@ -91,14 +91,16 @@ def read_tile_at_z(cycle_folders, Ntiles, region, real_tiles, cl, ch, x, y, z):
             path = str(cycle_folders[cl]) + '/TileScan 1--Z' + num2str(z, version='2') + '--C' + f'{ch:03d}' + '.tif'
 
         elif region == 0:
+            # This is the other common case
             path = f'{cycle_folders[cl]}/TileScan 1--Stage{real_tiles[x,y]}'+\
                    f'--Z{z:02d}--C{ch:02d}.tif'
 
 
         else:
-            path = str(cycle_folders[cl]) + \
+            # This is the most common case
+            path = str(cycle_folders[cl]) +\
                    '/TileScan 1/Region ' + str(region) +\
-                   '--Stage' + real_tiles[x,y] + \
+                   '--Stage' + real_tiles[x,y] +\
                    '--Z' + f'{z:02d}' + \
                    '--C' + f'{ch:02d}' + '.tif'
 
@@ -108,6 +110,36 @@ def read_tile_at_z(cycle_folders, Ntiles, region, real_tiles, cl, ch, x, y, z):
     #         z) + '_CH' + num2str(ch) + '.tif'
     
     i = cv2.imread(path, -1)
-    print(f"region: {region} Reading tile at: {path} size: {i.shape} dtype: {i.dtype}")
+    print(f"Leica DIR structure 1: region: {region} Reading tile at: {path} size: {i.shape} dtype: {i.dtype}")
+
+    return i
+
+
+def read_tile_at_z_leica_2(cycle_folders, Ntiles, region, real_tiles, cl, ch, x, y, z):
+    if cycle_folders:
+        # Areas consisting of a single tile are called 'Position' instead of 'Region'
+        if Ntiles == 1:
+            path = str(cycle_folders[cl]) + '/TileScan 1--Z' + num2str(z, version='2') + '--C' + f'{ch:03d}' + '.tif'
+
+        elif region == 0:
+            # This is the other common case
+            path = f'{cycle_folders[cl]}/TileScan 1--Stage{real_tiles[x,y]}'+\
+                   f'--Z{z:02d}--C{ch:02d}.tif'
+
+        else:
+            # This is the most common case
+            path = str(cycle_folders[cl]) +\
+                   '/Region ' + str(region) +\
+                   '--Stage' + real_tiles[x,y] +\
+                   '--Z' + f'{z:02d}' + \
+                   '--C' + f'{ch:02d}' + '.tif'
+
+    # else: # this is for reading some other kind of input format.
+    #     path = codex_obj.data_path + '/' + codex_obj.sample_id + '/cyc' + num2str(cl) + '_reg00' + num2str(
+    #         codex_obj.metadata['roi']) + '_00' + num2str((x - 1) * codex_obj.metadata['ny'] + y) + '_Z' + num2str(
+    #         z) + '_CH' + num2str(ch) + '.tif'
+    
+    i = cv2.imread(path, -1)
+    print(f"Leica DIR structure 2: region: {region} Reading tile at: {path} size: {i.shape} dtype: {i.dtype}")
 
     return i
