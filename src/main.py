@@ -22,7 +22,7 @@ alphabet = list('abcdefghijklmnopqrstuvwxyz1234567890')
 
 
 def img2uint8(img):
-    s = np.quantile(img.ravel(), 0.999)
+    s = np.quantile(img.ravel(), 0.9999)
     img_uint = img.copy().astype(np.float16)
     img_uint[img_uint > s] = s
     img_uint = img_uint / s
